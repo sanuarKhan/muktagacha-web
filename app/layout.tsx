@@ -8,6 +8,13 @@ export const metadata: Metadata = {
   title: "Muktagacha | Local Marketplace",
   description:
     "Buy from local shops, book local services, all in Muktagacha.",
+  icons: {
+    icon: [
+      { url: "/icon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: "/icon-192.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

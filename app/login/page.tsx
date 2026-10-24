@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 
@@ -34,10 +35,19 @@ export default function LoginPage() {
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-[var(--color-cream-100)] px-5">
       <div className="w-full max-w-sm bg-white rounded-[var(--radius-card)] shadow-elevated p-8">
-        <h1 className="font-display text-2xl font-semibold text-[var(--color-ink-900)] mb-1">
+        <div className="flex justify-center mb-5">
+          <Image
+            src="/logo-icon.png"
+            alt="Muktagacha"
+            width={56}
+            height={56}
+            className="h-14 w-14 object-contain"
+          />
+        </div>
+        <h1 className="font-display text-2xl font-semibold text-[var(--color-ink-900)] mb-1 text-center">
           Welcome back
         </h1>
-        <p className="text-[var(--color-ink-500)] text-sm mb-6">
+        <p className="text-[var(--color-ink-500)] text-sm mb-6 text-center">
           Log in to your Muktagacha account.
         </p>
         <form onSubmit={onSubmit} className="space-y-4">

@@ -2,17 +2,17 @@
 @import "tailwindcss";
 
 @theme {
-  /* Primary palette — deep emerald (trust, growth, local) */
-  --color-emerald-900: #0B3D2E;
-  --color-emerald-700: #15543F;
-  --color-emerald-600: #1B6B4F;
-  --color-emerald-500: #227F5E;
+  /* Primary palette — matched exactly to the Muktagacha logo */
+  --color-emerald-900: #0A4A32;
+  --color-emerald-700: #0C5B3E;
+  --color-emerald-600: #116B49;
+  --color-emerald-500: #157F57;
   --color-emerald-50: #EDF7F2;
 
-  /* Warm gold — premium, festive accent */
-  --color-gold-600: #B8812C;
-  --color-gold-500: #D4932C;
-  --color-gold-400: #E8A94A;
+  /* Warm gold — matched exactly to the logo's pin/awning orange */
+  --color-gold-600: #D4850F;
+  --color-gold-500: #F29E21;
+  --color-gold-400: #F5AE42;
   --color-gold-50: #FBF3E6;
 
   /* Warm neutrals — never pure white/black */

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 
@@ -10,11 +11,14 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-cream-50)]/90 backdrop-blur-md">
       <div className="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-[var(--color-emerald-700)] flex items-center justify-center">
-            <span className="font-display text-[var(--color-gold-400)] text-sm font-semibold">
-              M
-            </span>
-          </div>
+          <Image
+            src="/logo-icon.png"
+            alt="Muktagacha"
+            width={36}
+            height={36}
+            className="h-9 w-9 object-contain"
+            priority
+          />
           <span className="font-display text-lg font-semibold text-[var(--color-ink-900)]">
             Muktagacha
           </span>
