@@ -2,18 +2,25 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { compressImage } from "@/lib/image-upload";
+import { compressImage, uploadToCloudinary } from "@/lib/image-upload";
+import type { CloudinaryUploadSignature } from "@/lib/types";
 
 export default function ImageUploadField({
   value,
   onChange,
   label = "Photo",
   aspect = "square",
+  getUploadSignature,
 }: {
   value: string | null | undefined;
-  onChange: (dataUrl: string) => void;
+  onChange: (url: string) => void;
   label?: string;
   aspect?: "square" | "wide";
+  // When provided, uploads go to real object storage (Cloudinary) via
+  // this signed-upload fetcher instead of storing a base64 blob. Use
+  // this for anything that needs to scale (product photos); omit it
+  // for small one-off images (org logo) where base64 is still fine.
+  getUploadSignature?: () => Promise<CloudinaryUploadSignature>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -28,10 +35,19 @@ export default function ImageUploadField({
     setError(null);
     setBusy(true);
     try {
-      const compressed = await compressImage(file);
-      onChange(compressed);
-    } catch {
-      setError("Could not process that image. Try a different photo.");
+      if (getUploadSignature) {
+        const url = await uploadToCloudinary(file, getUploadSignature);
+        onChange(url);
+      } else {
+        const compressed = await compressImage(file);
+        onChange(compressed);
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not process that image. Try a different photo.",
+      );
     } finally {
       setBusy(false);
     }
@@ -73,7 +89,7 @@ export default function ImageUploadField({
               <path d="M21 15l-5-5L5 21" />
             </svg>
             <span className="text-xs font-medium">
-              {busy ? "Processing..." : "Tap to add a photo"}
+              {busy ? "Uploading..." : "Tap to add a photo"}
             </span>
           </div>
         )}

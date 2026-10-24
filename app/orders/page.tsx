@@ -14,6 +14,13 @@ const STATUS_COLORS: Record<string, string> = {
   CANCELLED: "bg-red-100 text-red-800",
 };
 
+const PAYMENT_STATUS_LABEL: Record<string, string> = {
+  NOT_SUBMITTED: "",
+  PENDING_VERIFICATION: "Payment pending vendor confirmation",
+  VERIFIED: "Payment confirmed",
+  REJECTED: "Payment rejected — contact vendor",
+};
+
 export default function OrdersPage() {
   const { token, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -73,6 +80,11 @@ export default function OrdersPage() {
                 </div>
               ))}
             </div>
+            {PAYMENT_STATUS_LABEL[order.paymentVerification] && (
+              <p className="text-xs text-[var(--color-ink-500)] mt-2 pt-2 border-t border-[var(--color-border)]">
+                {PAYMENT_STATUS_LABEL[order.paymentVerification]}
+              </p>
+            )}
           </div>
         ))}
       </div>

@@ -5,53 +5,52 @@ import Image from "next/image";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useCart } from "@/lib/cart-context";
-import type { Listing } from "@/lib/types";
+import type { Product, Category, ProductVariant } from "@/lib/types";
 
-const CATEGORIES = [
-  {
-    label: "All",
-    value: "All",
-  },
-  {
-    label: "Groceries",
-    value: "Groceries",
-    image:
-      "https://images.pexels.com/photos/35000204/pexels-photo-35000204.jpeg?auto=compress&cs=tinysrgb&h=600&w=800",
-  },
-  {
-    label: "Clothing",
-    value: "Clothing",
-    image:
-      "https://images.pexels.com/photos/36890954/pexels-photo-36890954.jpeg?auto=compress&cs=tinysrgb&h=600&w=800",
-  },
-  {
-    label: "Cosmetics",
-    value: "Cosmetics",
-    image:
-      "https://images.pexels.com/photos/34643810/pexels-photo-34643810.jpeg?auto=compress&cs=tinysrgb&h=600&w=800",
-  },
-];
+const CATEGORY_HERO_IMAGES: Record<string, string> = {
+  Groceries:
+    "https://images.pexels.com/photos/35000204/pexels-photo-35000204.jpeg?auto=compress&cs=tinysrgb&h=600&w=800",
+  Clothing:
+    "https://images.pexels.com/photos/36890954/pexels-photo-36890954.jpeg?auto=compress&cs=tinysrgb&h=600&w=800",
+  Cosmetics:
+    "https://images.pexels.com/photos/34643810/pexels-photo-34643810.jpeg?auto=compress&cs=tinysrgb&h=600&w=800",
+};
 
 export default function HomePage() {
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [category, setCategory] = useState("All");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryId, setCategoryId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { addItem, lines } = useCart();
+  const [variantPicker, setVariantPicker] = useState<Product | null>(null);
+
+  useEffect(() => {
+    api.get<Category[]>("/categories?vertical=MARKETPLACE").then(setCategories);
+  }, []);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    const qs =
-      category !== "All" ? `?category=${encodeURIComponent(category)}` : "";
+    const qs = categoryId ? `?categoryId=${encodeURIComponent(categoryId)}` : "";
     api
-      .get<Listing[]>(`/listings${qs}`)
-      .then(setListings)
+      .get<Product[]>(`/products${qs}`)
+      .then(setProducts)
       .catch(() =>
-        setError("Could not load listings. Is the backend running?"),
+        setError("Could not load products. Is the backend running?"),
       )
       .finally(() => setLoading(false));
-  }, [category]);
+  }, [categoryId]);
+
+  function handleAddToCart(product: Product) {
+    if (product.hasVariants && product.variants.length > 0) {
+      setVariantPicker(product);
+    } else {
+      addItem(product, null);
+    }
+  }
+
+  const selectedCategory = categories.find((c) => c.id === categoryId);
 
   return (
     <div>
@@ -97,46 +96,51 @@ export default function HomePage() {
       </section>
 
       <div id="browse" className="max-w-6xl mx-auto px-5 sm:px-8 py-12 sm:py-16">
-        {/* Category cards */}
-        <div className="grid grid-cols-3 gap-3 sm:gap-5 mb-12">
-          {CATEGORIES.filter((c) => c.image).map((c) => (
-            <button
-              key={c.value}
-              onClick={() => setCategory(c.value)}
-              className={`group relative aspect-[4/3] rounded-[var(--radius-card)] overflow-hidden shadow-card hover:shadow-hover-card transition-all ${
-                category === c.value
-                  ? "ring-2 ring-[var(--color-emerald-600)] ring-offset-2 ring-offset-[var(--color-cream-50)]"
-                  : ""
-              }`}
-            >
-              <Image
-                src={c.image!}
-                alt={c.label}
-                fill
-                className="object-cover group-hover:scale-105 transition-transform duration-500"
-                sizes="(max-width: 640px) 33vw, 200px"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-ink-900)]/70 via-transparent to-transparent" />
-              <span className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 text-[var(--color-cream-50)] font-display font-semibold text-sm sm:text-lg">
-                {c.label}
-              </span>
-            </button>
-          ))}
-        </div>
+        {/* Category cards - real admin-managed taxonomy */}
+        {categories.length > 0 && (
+          <div className="grid grid-cols-3 gap-3 sm:gap-5 mb-12">
+            {categories.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setCategoryId(categoryId === c.id ? "" : c.id)}
+                className={`group relative aspect-[4/3] rounded-[var(--radius-card)] overflow-hidden shadow-card hover:shadow-hover-card transition-all ${
+                  categoryId === c.id
+                    ? "ring-2 ring-[var(--color-emerald-600)] ring-offset-2 ring-offset-[var(--color-cream-50)]"
+                    : ""
+                }`}
+              >
+                <Image
+                  src={
+                    CATEGORY_HERO_IMAGES[c.name] ??
+                    CATEGORY_HERO_IMAGES.Groceries
+                  }
+                  alt={c.name}
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-500"
+                  sizes="(max-width: 640px) 33vw, 200px"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-ink-900)]/70 via-transparent to-transparent" />
+                <span className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 text-[var(--color-cream-50)] font-display font-semibold text-sm sm:text-lg">
+                  {c.name}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="font-display text-2xl font-semibold text-[var(--color-ink-900)]">
-              {category === "All" ? "All products" : category}
+              {selectedCategory ? selectedCategory.name : "All products"}
             </h2>
             <p className="text-[var(--color-ink-500)] text-sm mt-1">
-              {listings.length} item{listings.length === 1 ? "" : "s"} from
+              {products.length} item{products.length === 1 ? "" : "s"} from
               local vendors
             </p>
           </div>
-          {category !== "All" && (
+          {categoryId && (
             <button
-              onClick={() => setCategory("All")}
+              onClick={() => setCategoryId("")}
               className="text-sm text-[var(--color-emerald-700)] font-medium hover:underline"
             >
               Clear filter
@@ -169,39 +173,50 @@ export default function HomePage() {
           </div>
         )}
 
-        {!loading && !error && listings.length === 0 && (
+        {!loading && !error && products.length === 0 && (
           <div className="rounded-[var(--radius-card)] bg-[var(--color-cream-100)] p-10 text-center">
             <p className="text-[var(--color-ink-500)]">
-              No listings yet in this category. Check back soon!
+              No products yet in this category. Check back soon!
             </p>
           </div>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-          {listings.map((listing) => (
+          {products.map((product) => (
             <div
-              key={listing.id}
+              key={product.id}
               className="bg-white rounded-[var(--radius-card)] shadow-card hover:shadow-hover-card transition-shadow overflow-hidden flex flex-col"
             >
+              {product.images?.[0]?.url && (
+                <div className="relative aspect-[4/3] bg-[var(--color-cream-100)]">
+                  <Image
+                    src={product.images[0].url}
+                    alt={product.name}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+              )}
               <div className="p-5 flex flex-col flex-1">
                 <div className="text-xs text-[var(--color-ink-500)] mb-1.5">
-                  {listing.organization?.name ?? "Local vendor"}
+                  {product.organization?.name ?? "Local vendor"}
                 </div>
                 <h3 className="font-display font-semibold text-lg text-[var(--color-ink-900)] mb-1">
-                  {listing.name}
+                  {product.name}
                 </h3>
                 <p className="text-[var(--color-ink-500)] text-sm mb-4">
-                  {listing.category}
+                  {product.category?.name ?? ""}
                 </p>
                 <div className="mt-auto flex items-center justify-between">
                   <span className="font-semibold text-[var(--color-emerald-700)] text-lg">
-                    ৳{listing.price}
+                    {product.hasVariants ? "From " : ""}৳{product.basePrice}
                   </span>
                   <button
-                    onClick={() => addItem(listing)}
+                    onClick={() => handleAddToCart(product)}
                     className="bg-[var(--color-emerald-700)] text-[var(--color-cream-50)] px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors"
                   >
-                    Add to cart
+                    {product.hasVariants ? "Choose options" : "Add to cart"}
                   </button>
                 </div>
               </div>
@@ -237,6 +252,78 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {variantPicker && (
+        <VariantPickerModal
+          product={variantPicker}
+          onClose={() => setVariantPicker(null)}
+          onSelect={(variant) => {
+            addItem(variantPicker, variant);
+            setVariantPicker(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function VariantPickerModal({
+  product,
+  onClose,
+  onSelect,
+}: {
+  product: Product;
+  onClose: () => void;
+  onSelect: (variant: ProductVariant) => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 bg-[var(--color-ink-900)]/50 flex items-end sm:items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-[var(--radius-card)] shadow-elevated max-w-sm w-full p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="font-display font-semibold text-lg text-[var(--color-ink-900)] mb-1">
+          {product.name}
+        </h3>
+        <p className="text-sm text-[var(--color-ink-500)] mb-4">
+          Choose an option
+        </p>
+        <div className="space-y-2 max-h-72 overflow-y-auto">
+          {product.variants
+            .filter((v) => v.isActive && v.stockCount > 0)
+            .map((v) => (
+              <button
+                key={v.id}
+                onClick={() => onSelect(v)}
+                className="w-full flex items-center justify-between border border-[var(--color-border)] rounded-[12px] px-4 py-3 text-left hover:border-[var(--color-emerald-600)] hover:bg-[var(--color-emerald-50)] transition-colors"
+              >
+                <span className="text-sm font-medium text-[var(--color-ink-900)]">
+                  {Object.entries(v.optionValues)
+                    .map(([, val]) => val)
+                    .join(" / ")}
+                </span>
+                <span className="text-sm font-semibold text-[var(--color-emerald-700)]">
+                  ৳{v.priceOverride ?? product.basePrice}
+                </span>
+              </button>
+            ))}
+          {product.variants.filter((v) => v.isActive && v.stockCount > 0)
+            .length === 0 && (
+            <p className="text-sm text-[var(--color-ink-500)]">
+              Out of stock right now.
+            </p>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="mt-4 text-sm text-[var(--color-ink-500)] w-full text-center"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

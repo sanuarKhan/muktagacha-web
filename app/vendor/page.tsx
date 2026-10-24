@@ -6,7 +6,14 @@ import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import ImageUploadField from "@/components/ImageUploadField";
-import type { Listing, Order, Organization, Vertical } from "@/lib/types";
+import type {
+  Product,
+  Order,
+  Organization,
+  Vertical,
+  Category,
+  CloudinaryUploadSignature,
+} from "@/lib/types";
 
 const inputClass =
   "w-full border border-[var(--color-border)] rounded-[12px] px-4 py-2.5 text-[var(--color-ink-900)] focus:outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]";
@@ -83,9 +90,7 @@ export default function VendorPage() {
             </p>
             <ImageUploadField
               value={orgForm.logoUrl}
-              onChange={(dataUrl) =>
-                setOrgForm({ ...orgForm, logoUrl: dataUrl })
-              }
+              onChange={(url) => setOrgForm({ ...orgForm, logoUrl: url })}
               label="Shop photo"
             />
             <div>
@@ -154,60 +159,131 @@ const STATUS_STYLE: Record<string, string> = {
   REJECTED: "bg-red-50 text-red-600",
 };
 
+const PAYMENT_VERIFICATION_STYLE: Record<string, string> = {
+  NOT_SUBMITTED: "bg-[var(--color-ink-50,#f1f1ef)] text-[var(--color-ink-500)]",
+  PENDING_VERIFICATION: "bg-[var(--color-gold-50)] text-[var(--color-gold-600)]",
+  VERIFIED: "bg-[var(--color-emerald-50)] text-[var(--color-emerald-700)]",
+  REJECTED: "bg-red-50 text-red-600",
+};
+
+type VariantDraft = {
+  size: string;
+  color: string;
+  stockCount: string;
+  priceOverride: string;
+};
+
 function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
-  const [listings, setListings] = useState<Listing[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [showAddListing, setShowAddListing] = useState(false);
-  const [listingForm, setListingForm] = useState({
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [showPaymentSettings, setShowPaymentSettings] = useState(false);
+  const [paymentNumbers, setPaymentNumbers] = useState({
+    bkashNumber: org.bkashNumber ?? "",
+    nagadNumber: org.nagadNumber ?? "",
+  });
+  const [savingPayment, setSavingPayment] = useState(false);
+
+  const [hasVariants, setHasVariants] = useState(false);
+  const [variants, setVariants] = useState<VariantDraft[]>([
+    { size: "", color: "", stockCount: "", priceOverride: "" },
+  ]);
+  const [productForm, setProductForm] = useState({
     name: "",
     description: "",
-    price: "",
-    category: "",
+    basePrice: "",
+    categoryId: "",
     imageUrl: "" as string | null,
   });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api.get<Listing[]>(`/listings/organization/${org.id}`).then(setListings);
     api
-      .get<Order[]>(`/orders/organization/${org.id}`, token)
-      .then(setOrders);
-  }, [org.id, token]);
+      .get<Product[]>(`/products/organization/${org.id}`)
+      .then(setProducts);
+    api.get<Order[]>(`/orders/organization/${org.id}`, token).then(setOrders);
+    api
+      .get<Category[]>(`/categories?vertical=${org.vertical}`)
+      .then(setCategories);
+  }, [org.id, org.vertical, token]);
 
-  async function addListing(e: React.FormEvent) {
+  async function getUploadSignature(): Promise<CloudinaryUploadSignature> {
+    return api.get<CloudinaryUploadSignature>(
+      `/organizations/${org.id}/cloudinary/upload-signature`,
+      token,
+    );
+  }
+
+  function addVariantRow() {
+    setVariants((prev) => [
+      ...prev,
+      { size: "", color: "", stockCount: "", priceOverride: "" },
+    ]);
+  }
+
+  function removeVariantRow(index: number) {
+    setVariants((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updateVariant(index: number, field: keyof VariantDraft, value: string) {
+    setVariants((prev) =>
+      prev.map((v, i) => (i === index ? { ...v, [field]: value } : v)),
+    );
+  }
+
+  async function addProduct(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
-      const listing = await api.post<Listing>(
-        "/listings",
+      const builtVariants = hasVariants
+        ? variants
+            .filter((v) => v.size || v.color)
+            .map((v) => ({
+              optionValues: {
+                ...(v.size ? { size: v.size } : {}),
+                ...(v.color ? { color: v.color } : {}),
+              },
+              stockCount: Number(v.stockCount) || 0,
+              priceOverride: v.priceOverride ? Number(v.priceOverride) : undefined,
+            }))
+        : [];
+
+      const product = await api.post<Product>(
+        "/products",
         {
           organizationId: org.id,
-          type: "PRODUCT",
-          name: listingForm.name,
-          description: listingForm.description || undefined,
-          imageUrl: listingForm.imageUrl || undefined,
-          price: Number(listingForm.price),
-          category: listingForm.category,
+          categoryId: productForm.categoryId || undefined,
+          name: productForm.name,
+          description: productForm.description || undefined,
+          basePrice: Number(productForm.basePrice),
+          hasVariants,
+          images: productForm.imageUrl
+            ? [{ url: productForm.imageUrl }]
+            : undefined,
+          variants: builtVariants.length ? builtVariants : undefined,
         },
         token,
       );
-      setListings((prev) => [...prev, listing]);
-      setListingForm({
+      setProducts((prev) => [...prev, product]);
+      setProductForm({
         name: "",
         description: "",
-        price: "",
-        category: "",
+        basePrice: "",
+        categoryId: "",
         imageUrl: "",
       });
-      setShowAddListing(false);
+      setHasVariants(false);
+      setVariants([{ size: "", color: "", stockCount: "", priceOverride: "" }]);
+      setShowAddProduct(false);
     } finally {
       setSaving(false);
     }
   }
 
-  async function removeListing(id: string) {
-    await api.delete(`/listings/${id}`, token);
-    setListings((prev) => prev.filter((l) => l.id !== id));
+  async function removeProduct(id: string) {
+    await api.delete(`/products/${id}`, token);
+    setProducts((prev) => prev.filter((p) => p.id !== id));
   }
 
   async function updateOrderStatus(orderId: string, status: string) {
@@ -217,6 +293,26 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
       token,
     );
     setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+  }
+
+  async function verifyPayment(orderId: string, verification: "VERIFIED" | "REJECTED") {
+    const updated = await api.patch<Order>(
+      `/orders/${orderId}/verify-payment`,
+      { verification },
+      token,
+    );
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+  }
+
+  async function savePaymentNumbers(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingPayment(true);
+    try {
+      await api.patch(`/organizations/${org.id}/payment-numbers`, paymentNumbers, token);
+      setShowPaymentSettings(false);
+    } finally {
+      setSavingPayment(false);
+    }
   }
 
   return (
@@ -243,6 +339,12 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
             {org.approvalStatus}
           </span>
         </div>
+        <button
+          onClick={() => setShowPaymentSettings((s) => !s)}
+          className="text-sm text-[var(--color-emerald-700)] font-medium hover:underline"
+        >
+          Payment settings
+        </button>
       </div>
 
       {org.approvalStatus === "PENDING" && (
@@ -252,20 +354,61 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
         </p>
       )}
 
+      {showPaymentSettings && (
+        <form
+          onSubmit={savePaymentNumbers}
+          className="rounded-[14px] border border-[var(--color-border)] p-4 space-y-3 mb-6 max-w-sm"
+        >
+          <p className="text-xs text-[var(--color-ink-500)]">
+            Buyers pay these numbers directly via the bKash/Nagad app, then
+            submit a transaction ID for you to confirm.
+          </p>
+          <div>
+            <label className={labelClass}>bKash number</label>
+            <input
+              placeholder="01XXXXXXXXX"
+              value={paymentNumbers.bkashNumber}
+              onChange={(e) =>
+                setPaymentNumbers({ ...paymentNumbers, bkashNumber: e.target.value })
+              }
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Nagad number</label>
+            <input
+              placeholder="01XXXXXXXXX"
+              value={paymentNumbers.nagadNumber}
+              onChange={(e) =>
+                setPaymentNumbers({ ...paymentNumbers, nagadNumber: e.target.value })
+              }
+              className={inputClass}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={savingPayment}
+            className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-5 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] disabled:opacity-50"
+          >
+            {savingPayment ? "Saving..." : "Save"}
+          </button>
+        </form>
+      )}
+
       <h3 className="font-display font-semibold text-[var(--color-ink-900)] mb-3">
         Products
       </h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-        {listings.map((l) => (
+        {products.map((p) => (
           <div
-            key={l.id}
+            key={p.id}
             className="rounded-[14px] border border-[var(--color-border)] overflow-hidden bg-[var(--color-cream-50)]"
           >
             <div className="relative aspect-square bg-[var(--color-cream-100)]">
-              {l.imageUrl ? (
+              {p.images?.[0]?.url ? (
                 <Image
-                  src={l.imageUrl}
-                  alt={l.name}
+                  src={p.images[0].url}
+                  alt={p.name}
                   fill
                   className="object-cover"
                   unoptimized
@@ -278,14 +421,19 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
             </div>
             <div className="p-2.5">
               <p className="text-sm font-medium text-[var(--color-ink-900)] truncate">
-                {l.name}
+                {p.name}
               </p>
+              {p.hasVariants && (
+                <p className="text-xs text-[var(--color-ink-500)]">
+                  {p.variants.length} variant(s)
+                </p>
+              )}
               <div className="flex items-center justify-between mt-1">
                 <span className="text-sm font-semibold text-[var(--color-emerald-700)]">
-                  ৳{l.price}
+                  ৳{p.basePrice}
                 </span>
                 <button
-                  onClick={() => removeListing(l.id)}
+                  onClick={() => removeProduct(p.id)}
                   className="text-xs text-[var(--color-ink-300)] hover:text-red-600"
                 >
                   Remove
@@ -294,68 +442,145 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
             </div>
           </div>
         ))}
-        {listings.length === 0 && (
+        {products.length === 0 && (
           <p className="text-sm text-[var(--color-ink-300)] col-span-full">
             No products yet.
           </p>
         )}
       </div>
 
-      {!showAddListing ? (
+      {!showAddProduct ? (
         <button
-          onClick={() => setShowAddListing(true)}
+          onClick={() => setShowAddProduct(true)}
           className="text-sm text-[var(--color-emerald-700)] font-medium border border-[var(--color-emerald-600)] rounded-[var(--radius-pill)] px-4 py-2 hover:bg-[var(--color-emerald-50)] transition-colors"
         >
           + Add product
         </button>
       ) : (
         <form
-          onSubmit={addListing}
+          onSubmit={addProduct}
           className="rounded-[14px] border border-[var(--color-border)] p-4 space-y-3 max-w-sm"
         >
           <ImageUploadField
-            value={listingForm.imageUrl}
-            onChange={(dataUrl) =>
-              setListingForm({ ...listingForm, imageUrl: dataUrl })
-            }
+            value={productForm.imageUrl}
+            onChange={(url) => setProductForm({ ...productForm, imageUrl: url })}
             label="Product photo"
+            getUploadSignature={getUploadSignature}
           />
           <input
             required
             placeholder="Product name"
-            value={listingForm.name}
+            value={productForm.name}
             onChange={(e) =>
-              setListingForm({ ...listingForm, name: e.target.value })
+              setProductForm({ ...productForm, name: e.target.value })
             }
             className={inputClass}
           />
           <textarea
             placeholder="Short description (optional)"
-            value={listingForm.description}
+            value={productForm.description}
             onChange={(e) =>
-              setListingForm({ ...listingForm, description: e.target.value })
+              setProductForm({ ...productForm, description: e.target.value })
             }
             rows={2}
             className={inputClass}
           />
+          <div>
+            <label className={labelClass}>Category</label>
+            <select
+              value={productForm.categoryId}
+              onChange={(e) =>
+                setProductForm({ ...productForm, categoryId: e.target.value })
+              }
+              className={inputClass}
+            >
+              <option value="">Select a category</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            {categories.length === 0 && (
+              <p className="text-xs text-[var(--color-ink-300)] mt-1">
+                No categories set up yet for this shop type — ask the admin
+                to add one, or leave blank for now.
+              </p>
+            )}
+          </div>
           <input
             required
             type="number"
-            placeholder="Price (৳)"
-            value={listingForm.price}
+            placeholder={hasVariants ? "Starting price (৳)" : "Price (৳)"}
+            value={productForm.basePrice}
             onChange={(e) =>
-              setListingForm({ ...listingForm, price: e.target.value })
+              setProductForm({ ...productForm, basePrice: e.target.value })
             }
             className={inputClass}
           />
-          <input
-            placeholder="Category (e.g. Clothing)"
-            value={listingForm.category}
-            onChange={(e) =>
-              setListingForm({ ...listingForm, category: e.target.value })
-            }
-            className={inputClass}
-          />
+
+          <label className="flex items-center gap-2 text-sm text-[var(--color-ink-700)]">
+            <input
+              type="checkbox"
+              checked={hasVariants}
+              onChange={(e) => setHasVariants(e.target.checked)}
+            />
+            This product comes in different sizes/colors
+          </label>
+
+          {hasVariants && (
+            <div className="space-y-2 bg-[var(--color-cream-100)] rounded-[12px] p-3">
+              <p className="text-xs text-[var(--color-ink-500)]">
+                Add each size/color combination you stock, with its own
+                quantity. Leave price blank to use the base price above.
+              </p>
+              {variants.map((v, i) => (
+                <div key={i} className="flex gap-1.5 items-center">
+                  <input
+                    placeholder="Size"
+                    value={v.size}
+                    onChange={(e) => updateVariant(i, "size", e.target.value)}
+                    className="w-16 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
+                  />
+                  <input
+                    placeholder="Color"
+                    value={v.color}
+                    onChange={(e) => updateVariant(i, "color", e.target.value)}
+                    className="w-20 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Qty"
+                    value={v.stockCount}
+                    onChange={(e) => updateVariant(i, "stockCount", e.target.value)}
+                    className="w-16 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
+                  />
+                  <input
+                    type="number"
+                    placeholder="৳ (opt.)"
+                    value={v.priceOverride}
+                    onChange={(e) => updateVariant(i, "priceOverride", e.target.value)}
+                    className="w-20 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeVariantRow(i)}
+                    className="text-[var(--color-ink-300)] hover:text-red-600 text-sm px-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addVariantRow}
+                className="text-xs text-[var(--color-emerald-700)] font-medium"
+              >
+                + Add another combination
+              </button>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <button
               type="submit"
@@ -366,7 +591,7 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
             </button>
             <button
               type="button"
-              onClick={() => setShowAddListing(false)}
+              onClick={() => setShowAddProduct(false)}
               className="text-sm text-[var(--color-ink-500)] px-3"
             >
               Cancel
@@ -385,27 +610,62 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
         {orders.map((order) => (
           <div
             key={order.id}
-            className="rounded-[14px] border border-[var(--color-border)] p-3 flex items-center justify-between"
+            className="rounded-[14px] border border-[var(--color-border)] p-3"
           >
-            <div className="text-sm">
-              <p className="font-medium text-[var(--color-ink-900)]">
-                {order.buyer?.fullName ?? "Buyer"}
-              </p>
-              <p className="text-[var(--color-ink-500)] text-xs">
-                {order.items.length} item(s)
-              </p>
+            <div className="flex items-center justify-between">
+              <div className="text-sm">
+                <p className="font-medium text-[var(--color-ink-900)]">
+                  {order.buyer?.fullName ?? "Buyer"}
+                </p>
+                <p className="text-[var(--color-ink-500)] text-xs">
+                  {order.items.length} item(s) · {order.paymentMethod}
+                </p>
+              </div>
+              <select
+                value={order.status}
+                onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                className="text-sm border border-[var(--color-border)] rounded-[10px] px-2 py-1.5 bg-white"
+              >
+                <option value="PENDING">Pending</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="OUT_FOR_DELIVERY">Out for delivery</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
             </div>
-            <select
-              value={order.status}
-              onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-              className="text-sm border border-[var(--color-border)] rounded-[10px] px-2 py-1.5 bg-white"
-            >
-              <option value="PENDING">Pending</option>
-              <option value="CONFIRMED">Confirmed</option>
-              <option value="OUT_FOR_DELIVERY">Out for delivery</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
+
+            {order.paymentMethod !== "CASH_ON_DELIVERY" && (
+              <div className="mt-2 pt-2 border-t border-[var(--color-border)] flex items-center justify-between">
+                <div className="text-xs">
+                  <span
+                    className={`inline-block px-2 py-0.5 rounded-full font-medium mr-2 ${PAYMENT_VERIFICATION_STYLE[order.paymentVerification]}`}
+                  >
+                    {order.paymentVerification.replace("_", " ")}
+                  </span>
+                  {order.paymentTrxId && (
+                    <span className="text-[var(--color-ink-500)]">
+                      TrxID: {order.paymentTrxId}
+                    </span>
+                  )}
+                </div>
+                {order.paymentVerification === "PENDING_VERIFICATION" && (
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => verifyPayment(order.id, "VERIFIED")}
+                      className="text-xs bg-[var(--color-emerald-700)] text-white px-2.5 py-1 rounded-full font-medium hover:bg-[var(--color-emerald-900)]"
+                    >
+                      Confirm payment
+                    </button>
+                    <button
+                      onClick={() => verifyPayment(order.id, "REJECTED")}
+                      className="text-xs bg-red-50 text-red-700 px-2.5 py-1 rounded-full font-medium hover:bg-red-100"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>

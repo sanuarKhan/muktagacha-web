@@ -1,6 +1,5 @@
 export type UserRole = "BUYER" | "VENDOR" | "PROVIDER" | "ADMIN";
 export type Vertical = "MARKETPLACE" | "PHARMACY" | "SERVICES";
-export type ListingType = "PRODUCT" | "SERVICE" | "MEDICINE";
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type OrderStatus =
   | "PENDING"
@@ -9,6 +8,11 @@ export type OrderStatus =
   | "COMPLETED"
   | "CANCELLED";
 export type PaymentMethod = "CASH_ON_DELIVERY" | "BKASH" | "NAGAD";
+export type PaymentVerificationStatus =
+  | "NOT_SUBMITTED"
+  | "PENDING_VERIFICATION"
+  | "VERIFIED"
+  | "REJECTED";
 
 export interface User {
   id: string;
@@ -31,26 +35,62 @@ export interface Organization {
   deliveryRadiusKm?: string | null;
   approvalStatus: ApprovalStatus;
   createdAt: string;
+  bkashNumber?: string | null;
+  nagadNumber?: string | null;
+  cloudinaryCloudName?: string | null;
 }
 
-export interface Listing {
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  vertical: Vertical;
+  parentId?: string | null;
+  children?: Category[];
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface ProductImage {
+  id: string;
+  url: string;
+  sortOrder: number;
+}
+
+export interface ProductVariant {
+  id: string;
+  sku?: string | null;
+  optionValues: Record<string, string>;
+  priceOverride?: string | null;
+  stockCount: number;
+  isActive: boolean;
+}
+
+export interface Product {
   id: string;
   organizationId: string;
-  type: ListingType;
+  categoryId?: string | null;
+  category?: Category | null;
   name: string;
+  slug: string;
   description?: string | null;
-  imageUrl?: string | null;
-  price?: string | null;
-  category?: string | null;
+  basePrice: string;
+  hasVariants: boolean;
+  images: ProductImage[];
+  variants: ProductVariant[];
   isActive: boolean;
   createdAt: string;
+  updatedAt: string;
   organization?: Organization;
 }
 
 export interface OrderItem {
   id: string;
   orderId: string;
-  listingId: string;
+  productId: string;
+  variantId?: string | null;
+  product?: Product;
+  variant?: ProductVariant | null;
   quantity: number;
   price: string;
 }
@@ -61,6 +101,9 @@ export interface Order {
   organizationId: string;
   status: OrderStatus;
   paymentMethod: PaymentMethod;
+  paymentTrxId?: string | null;
+  paymentVerification: PaymentVerificationStatus;
+  paymentVerifiedAt?: string | null;
   createdAt: string;
   items: OrderItem[];
   organization?: Organization;
@@ -70,4 +113,12 @@ export interface Order {
 export interface AuthResponse {
   user: User;
   accessToken: string;
+}
+
+export interface CloudinaryUploadSignature {
+  cloudName: string;
+  apiKey: string;
+  timestamp: number;
+  signature: string;
+  folder: string;
 }

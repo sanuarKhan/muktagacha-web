@@ -6,18 +6,25 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Listing } from "./types";
+import type { Product, ProductVariant } from "./types";
 
 export interface CartLine {
-  listing: Listing;
+  product: Product;
+  variant?: ProductVariant | null;
   quantity: number;
+}
+
+// A cart line is uniquely identified by product + variant (the same
+// product can appear twice with two different sizes/colors).
+function lineKey(productId: string, variantId?: string | null) {
+  return `${productId}:${variantId ?? ""}`;
 }
 
 interface CartContextValue {
   lines: CartLine[];
-  addItem: (listing: Listing) => void;
-  removeItem: (listingId: string) => void;
-  setQuantity: (listingId: string, quantity: number) => void;
+  addItem: (product: Product, variant?: ProductVariant | null) => void;
+  removeItem: (productId: string, variantId?: string | null) => void;
+  setQuantity: (productId: string, variantId: string | null | undefined, quantity: number) => void;
   clear: () => void;
   // Carts can span multiple vendors; checkout groups by organizationId
   // since each vendor fulfills their own sub-order independently.
@@ -29,29 +36,44 @@ const CartContext = createContext<CartContextValue | undefined>(undefined);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>([]);
 
-  function addItem(listing: Listing) {
+  function addItem(product: Product, variant?: ProductVariant | null) {
+    const key = lineKey(product.id, variant?.id);
     setLines((prev) => {
-      const existing = prev.find((l) => l.listing.id === listing.id);
+      const existing = prev.find(
+        (l) => lineKey(l.product.id, l.variant?.id) === key,
+      );
       if (existing) {
         return prev.map((l) =>
-          l.listing.id === listing.id ? { ...l, quantity: l.quantity + 1 } : l,
+          lineKey(l.product.id, l.variant?.id) === key
+            ? { ...l, quantity: l.quantity + 1 }
+            : l,
         );
       }
-      return [...prev, { listing, quantity: 1 }];
+      return [...prev, { product, variant, quantity: 1 }];
     });
   }
 
-  function removeItem(listingId: string) {
-    setLines((prev) => prev.filter((l) => l.listing.id !== listingId));
+  function removeItem(productId: string, variantId?: string | null) {
+    const key = lineKey(productId, variantId);
+    setLines((prev) =>
+      prev.filter((l) => lineKey(l.product.id, l.variant?.id) !== key),
+    );
   }
 
-  function setQuantity(listingId: string, quantity: number) {
+  function setQuantity(
+    productId: string,
+    variantId: string | null | undefined,
+    quantity: number,
+  ) {
     if (quantity <= 0) {
-      removeItem(listingId);
+      removeItem(productId, variantId);
       return;
     }
+    const key = lineKey(productId, variantId);
     setLines((prev) =>
-      prev.map((l) => (l.listing.id === listingId ? { ...l, quantity } : l)),
+      prev.map((l) =>
+        lineKey(l.product.id, l.variant?.id) === key ? { ...l, quantity } : l,
+      ),
     );
   }
 
@@ -61,7 +83,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   function linesByOrganization() {
     return lines.reduce<Record<string, CartLine[]>>((acc, line) => {
-      const orgId = line.listing.organizationId;
+      const orgId = line.product.organizationId;
       acc[orgId] = acc[orgId] ? [...acc[orgId], line] : [line];
       return acc;
     }, {});
