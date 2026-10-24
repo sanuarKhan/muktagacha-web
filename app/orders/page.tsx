@@ -37,23 +37,23 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <h1 className="text-xl font-bold mb-6">My Orders</h1>
+    <div className="max-w-2xl mx-auto px-5 py-10">
+      <h1 className="font-display text-2xl font-semibold text-[var(--color-ink-900)] mb-6">My Orders</h1>
       {orders.length === 0 && (
-        <p className="text-neutral-500">You haven't placed any orders yet.</p>
+        <p className="text-[var(--color-ink-500)]">You haven't placed any orders yet.</p>
       )}
       <div className="space-y-4">
         {orders.map((order) => (
           <div
             key={order.id}
-            className="bg-white border border-neutral-200 rounded-lg p-4"
+            className="bg-white rounded-[var(--radius-card)] shadow-card p-4"
           >
             <div className="flex justify-between items-start mb-2">
               <div>
                 <p className="font-semibold">
                   {order.organization?.name ?? "Vendor"}
                 </p>
-                <p className="text-xs text-neutral-400">
+                <p className="text-xs text-[var(--color-ink-300)]">
                   {new Date(order.createdAt).toLocaleString()}
                 </p>
               </div>
@@ -65,7 +65,7 @@ export default function OrdersPage() {
                 {order.status.replace(/_/g, " ")}
               </span>
             </div>
-            <div className="text-sm text-neutral-600">
+            <div className="text-sm text-[var(--color-ink-700)]">
               {order.items.map((item) => (
                 <div key={item.id} className="flex justify-between">
                   <span>Qty {item.quantity}</span>

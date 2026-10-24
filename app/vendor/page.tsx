@@ -51,15 +51,15 @@ export default function VendorPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-xl font-bold mb-6">My Store</h1>
+    <div className="max-w-3xl mx-auto px-5 py-10">
+      <h1 className="font-display text-2xl font-semibold text-[var(--color-ink-900)] mb-6">My Store</h1>
 
       {orgs.length === 0 && (
         <form
           onSubmit={createOrg}
-          className="bg-white border border-neutral-200 rounded-lg p-4 mb-6 space-y-3"
+          className="bg-white rounded-[var(--radius-card)] shadow-card p-4 mb-6 space-y-3"
         >
-          <p className="text-sm text-neutral-500 mb-2">
+          <p className="text-sm text-[var(--color-ink-500)] mb-2">
             You don't have a storefront yet. Create one — it will need admin
             approval before it goes live.
           </p>
@@ -68,14 +68,14 @@ export default function VendorPage() {
             placeholder="Store name"
             value={orgForm.name}
             onChange={(e) => setOrgForm({ ...orgForm, name: e.target.value })}
-            className="w-full border border-neutral-300 rounded-md px-3 py-2"
+            className="w-full border border-neutral-300 rounded-[12px] px-3 py-2"
           />
           <select
             value={orgForm.vertical}
             onChange={(e) =>
               setOrgForm({ ...orgForm, vertical: e.target.value as Vertical })
             }
-            className="w-full border border-neutral-300 rounded-md px-3 py-2"
+            className="w-full border border-neutral-300 rounded-[12px] px-3 py-2"
           >
             <option value="MARKETPLACE">Marketplace (products)</option>
             <option value="PHARMACY">Pharmacy</option>
@@ -85,12 +85,12 @@ export default function VendorPage() {
             placeholder="Ward (e.g. Ward 3)"
             value={orgForm.ward}
             onChange={(e) => setOrgForm({ ...orgForm, ward: e.target.value })}
-            className="w-full border border-neutral-300 rounded-md px-3 py-2"
+            className="w-full border border-neutral-300 rounded-[12px] px-3 py-2"
           />
           <button
             type="submit"
             disabled={creatingOrg}
-            className="bg-emerald-600 text-white rounded-md px-4 py-2 font-medium hover:bg-emerald-700 disabled:opacity-50"
+            className="bg-[var(--color-emerald-700)] text-white rounded-[12px] px-4 py-2 font-medium hover:bg-[var(--color-emerald-900)] disabled:opacity-50"
           >
             {creatingOrg ? "Creating..." : "Create storefront"}
           </button>
@@ -149,7 +149,7 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
   }
 
   return (
-    <div className="bg-white border border-neutral-200 rounded-lg p-4 mb-6">
+    <div className="bg-white rounded-[var(--radius-card)] shadow-card p-4 mb-6">
       <div className="flex items-center justify-between mb-3">
         <h2 className="font-semibold">{org.name}</h2>
         <span
@@ -166,7 +166,7 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
       </div>
 
       {org.approvalStatus === "PENDING" && (
-        <p className="text-sm text-neutral-500 mb-4">
+        <p className="text-sm text-[var(--color-ink-500)] mb-4">
           Waiting for admin approval. You can still add products now — they'll
           appear once approved.
         </p>
@@ -181,14 +181,14 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
           </div>
         ))}
         {listings.length === 0 && (
-          <p className="text-sm text-neutral-400">No products yet.</p>
+          <p className="text-sm text-[var(--color-ink-300)]">No products yet.</p>
         )}
       </div>
 
       {!showAddListing ? (
         <button
           onClick={() => setShowAddListing(true)}
-          className="text-sm text-emerald-700 font-medium"
+          className="text-sm text-[var(--color-emerald-700)] font-medium"
         >
           + Add product
         </button>
@@ -201,7 +201,7 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
             onChange={(e) =>
               setListingForm({ ...listingForm, name: e.target.value })
             }
-            className="w-full border border-neutral-300 rounded-md px-2 py-1.5 text-sm"
+            className="w-full border border-neutral-300 rounded-[12px] px-2 py-1.5 text-sm"
           />
           <input
             required
@@ -211,7 +211,7 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
             onChange={(e) =>
               setListingForm({ ...listingForm, price: e.target.value })
             }
-            className="w-full border border-neutral-300 rounded-md px-2 py-1.5 text-sm"
+            className="w-full border border-neutral-300 rounded-[12px] px-2 py-1.5 text-sm"
           />
           <input
             placeholder="Category"
@@ -219,11 +219,11 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
             onChange={(e) =>
               setListingForm({ ...listingForm, category: e.target.value })
             }
-            className="w-full border border-neutral-300 rounded-md px-2 py-1.5 text-sm"
+            className="w-full border border-neutral-300 rounded-[12px] px-2 py-1.5 text-sm"
           />
           <button
             type="submit"
-            className="bg-emerald-600 text-white rounded-md px-3 py-1.5 text-sm font-medium"
+            className="bg-[var(--color-emerald-700)] text-white rounded-[12px] px-3 py-1.5 text-sm font-medium"
           >
             Save
           </button>
@@ -232,23 +232,23 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
 
       <h3 className="text-sm font-semibold mt-6 mb-2">Orders</h3>
       {orders.length === 0 && (
-        <p className="text-sm text-neutral-400">No orders yet.</p>
+        <p className="text-sm text-[var(--color-ink-300)]">No orders yet.</p>
       )}
       {orders.map((order) => (
         <div
           key={order.id}
-          className="border border-neutral-100 rounded-md p-2 mb-2 flex items-center justify-between"
+          className="border border-neutral-100 rounded-[12px] p-2 mb-2 flex items-center justify-between"
         >
           <div className="text-sm">
             <p>{order.buyer?.fullName ?? "Buyer"}</p>
-            <p className="text-neutral-400 text-xs">
+            <p className="text-[var(--color-ink-300)] text-xs">
               {order.items.length} item(s)
             </p>
           </div>
           <select
             value={order.status}
             onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-            className="text-sm border border-neutral-300 rounded-md px-2 py-1"
+            className="text-sm border border-neutral-300 rounded-[12px] px-2 py-1"
           >
             <option value="PENDING">Pending</option>
             <option value="CONFIRMED">Confirmed</option>

@@ -59,28 +59,29 @@ export default function CheckoutPage() {
 
   if (lines.length === 0) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-12 text-center">
-        <p className="text-neutral-500">Your cart is empty.</p>
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-[var(--color-cream-100)]">
+        <p className="text-[var(--color-ink-500)]">Your cart is empty.</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <h1 className="text-xl font-bold mb-6">Checkout</h1>
+    <div className="min-h-[calc(100vh-4rem)] bg-[var(--color-cream-100)] px-5 py-10">
+      <div className="max-w-2xl mx-auto">
+      <h1 className="font-display text-2xl font-semibold text-[var(--color-ink-900)] mb-6">Checkout</h1>
 
       {Object.entries(grouped).map(([orgId, groupLines]) => (
         <div
           key={orgId}
-          className="bg-white border border-neutral-200 rounded-lg p-4 mb-4"
+          className="bg-white rounded-[var(--radius-card)] shadow-card p-5 mb-4"
         >
-          <h3 className="font-semibold text-sm text-neutral-500 mb-2">
+          <h3 className="font-semibold text-sm text-[var(--color-ink-500)] mb-2">
             {groupLines[0].listing.organization?.name ?? "Vendor"}
           </h3>
           {groupLines.map((l) => (
             <div
               key={l.listing.id}
-              className="flex justify-between text-sm py-1"
+              className="flex justify-between text-sm py-1 text-[var(--color-ink-700)]"
             >
               <span>
                 {l.listing.name} × {l.quantity}
@@ -91,19 +92,19 @@ export default function CheckoutPage() {
         </div>
       ))}
 
-      <div className="flex justify-between font-bold text-lg mb-6">
+      <div className="flex justify-between font-display font-semibold text-xl mb-6 text-[var(--color-ink-900)]">
         <span>Total</span>
         <span>৳{total}</span>
       </div>
 
       <div className="mb-6">
-        <label className="block text-sm font-medium mb-2">
+        <label className="block text-sm font-medium text-[var(--color-ink-700)] mb-2">
           Payment method
         </label>
         <select
           value={paymentMethod}
           onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-          className="w-full border border-neutral-300 rounded-md px-3 py-2"
+          className="w-full border border-[var(--color-border)] rounded-[12px] px-4 py-2.5 bg-white text-[var(--color-ink-900)] focus:outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]"
         >
           <option value="CASH_ON_DELIVERY">Cash on Delivery</option>
           <option value="BKASH">bKash (pay vendor directly)</option>
@@ -111,15 +112,16 @@ export default function CheckoutPage() {
         </select>
       </div>
 
-      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+      {error && <p className="text-sm text-red-600 mb-4 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
       <button
         onClick={placeOrders}
         disabled={submitting}
-        className="w-full bg-emerald-600 text-white rounded-md py-2.5 font-medium hover:bg-emerald-700 disabled:opacity-50"
+        className="w-full bg-[var(--color-emerald-700)] text-[var(--color-cream-50)] rounded-[var(--radius-pill)] py-3 font-medium hover:bg-[var(--color-emerald-900)] transition-colors disabled:opacity-50"
       >
         {submitting ? "Placing order..." : "Place Order"}
       </button>
+      </div>
     </div>
   );
 }

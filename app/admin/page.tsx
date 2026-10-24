@@ -47,33 +47,33 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-xl font-bold mb-6">Vendor Approvals</h1>
+    <div className="max-w-3xl mx-auto px-5 py-10">
+      <h1 className="font-display text-2xl font-semibold text-[var(--color-ink-900)] mb-6">Vendor Approvals</h1>
       {pending.length === 0 && (
-        <p className="text-neutral-500">No pending storefronts to review.</p>
+        <p className="text-[var(--color-ink-500)]">No pending storefronts to review.</p>
       )}
       <div className="space-y-3">
         {pending.map((org) => (
           <div
             key={org.id}
-            className="bg-white border border-neutral-200 rounded-lg p-4 flex items-center justify-between"
+            className="bg-white rounded-[var(--radius-card)] shadow-card p-4 flex items-center justify-between"
           >
             <div>
               <p className="font-semibold">{org.name}</p>
-              <p className="text-sm text-neutral-500">
+              <p className="text-sm text-[var(--color-ink-500)]">
                 {org.vertical} · {org.area} {org.ward ? `· ${org.ward}` : ""}
               </p>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={() => approve(org.id)}
-                className="bg-emerald-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-emerald-700"
+                className="bg-[var(--color-emerald-700)] text-white px-3 py-1.5 rounded-[12px] text-sm font-medium hover:bg-[var(--color-emerald-900)]"
               >
                 Approve
               </button>
               <button
                 onClick={() => reject(org.id)}
-                className="bg-red-50 text-red-700 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-red-100"
+                className="bg-red-50 text-red-700 px-3 py-1.5 rounded-[12px] text-sm font-medium hover:bg-red-100"
               >
                 Reject
               </button>

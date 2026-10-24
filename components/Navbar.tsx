@@ -7,25 +7,38 @@ export default function Navbar() {
   const { user, logout } = useAuth();
 
   return (
-    <header className="border-b border-neutral-200 bg-white">
-      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-        <Link href="/" className="text-lg font-bold text-emerald-700">
-          Muktagacha
+    <header className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-cream-50)]/90 backdrop-blur-md">
+      <div className="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-[var(--color-emerald-700)] flex items-center justify-center">
+            <span className="font-display text-[var(--color-gold-400)] text-sm font-semibold">
+              M
+            </span>
+          </div>
+          <span className="font-display text-lg font-semibold text-[var(--color-ink-900)]">
+            Muktagacha
+          </span>
         </Link>
 
-        <nav className="flex items-center gap-4 text-sm">
-          <Link href="/" className="hover:text-emerald-700">
+        <nav className="flex items-center gap-5 text-sm">
+          <Link
+            href="/"
+            className="hidden sm:inline text-[var(--color-ink-700)] hover:text-[var(--color-emerald-700)] transition-colors"
+          >
             Browse
           </Link>
 
           {!user && (
             <>
-              <Link href="/login" className="hover:text-emerald-700">
-                Login
+              <Link
+                href="/login"
+                className="text-[var(--color-ink-700)] hover:text-[var(--color-emerald-700)] transition-colors"
+              >
+                Log in
               </Link>
               <Link
                 href="/register"
-                className="bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700"
+                className="bg-[var(--color-emerald-700)] text-[var(--color-cream-50)] px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors shadow-card"
               >
                 Sign up
               </Link>
@@ -34,25 +47,36 @@ export default function Navbar() {
 
           {user && (
             <>
-              <Link href="/orders" className="hover:text-emerald-700">
-                My Orders
+              <Link
+                href="/orders"
+                className="hidden sm:inline text-[var(--color-ink-700)] hover:text-[var(--color-emerald-700)] transition-colors"
+              >
+                My orders
               </Link>
               {(user.role === "VENDOR" || user.role === "PROVIDER") && (
-                <Link href="/vendor" className="hover:text-emerald-700">
-                  My Store
+                <Link
+                  href="/vendor"
+                  className="hidden sm:inline text-[var(--color-ink-700)] hover:text-[var(--color-emerald-700)] transition-colors"
+                >
+                  My store
                 </Link>
               )}
               {user.role === "ADMIN" && (
-                <Link href="/admin" className="hover:text-emerald-700">
+                <Link
+                  href="/admin"
+                  className="hidden sm:inline text-[var(--color-ink-700)] hover:text-[var(--color-emerald-700)] transition-colors"
+                >
                   Admin
                 </Link>
               )}
-              <span className="text-neutral-500">{user.fullName}</span>
+              <span className="hidden md:inline text-[var(--color-ink-500)] text-sm">
+                {user.fullName}
+              </span>
               <button
                 onClick={logout}
-                className="text-neutral-500 hover:text-red-600"
+                className="text-[var(--color-ink-500)] hover:text-[var(--color-emerald-700)] transition-colors"
               >
-                Logout
+                Log out
               </button>
             </>
           )}
