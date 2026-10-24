@@ -24,6 +24,7 @@ export interface Organization {
   id: string;
   ownerUserId: string;
   name: string;
+  logoUrl?: string | null;
   vertical: Vertical;
   area?: string | null;
   ward?: string | null;
@@ -37,6 +38,8 @@ export interface Listing {
   organizationId: string;
   type: ListingType;
   name: string;
+  description?: string | null;
+  imageUrl?: string | null;
   price?: string | null;
   category?: string | null;
   isActive: boolean;
