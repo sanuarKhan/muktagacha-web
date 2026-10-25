@@ -15,6 +15,7 @@ import type {
   CloudinaryUploadSignature,
   MarketingContact,
   MarketingCampaign,
+  RiderProfile,
 } from "@/lib/types";
 
 const inputClass =
@@ -737,6 +738,11 @@ function OrdersTab({
   setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
 }) {
   const [filter, setFilter] = useState<string>("ALL");
+  const [riders, setRiders] = useState<RiderProfile[]>([]);
+
+  useEffect(() => {
+    api.get<RiderProfile[]>("/riders/approved", token).then(setRiders);
+  }, [token]);
 
   async function updateOrderStatus(orderId: string, status: string) {
     const updated = await api.patch<Order>(`/orders/${orderId}/status`, { status }, token);
@@ -747,6 +753,16 @@ function OrdersTab({
     const updated = await api.patch<Order>(
       `/orders/${orderId}/verify-payment`,
       { verification },
+      token,
+    );
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+  }
+
+  async function assignRider(orderId: string, riderId: string) {
+    if (!riderId) return;
+    const updated = await api.post<Order>(
+      `/riders/orders/${orderId}/assign`,
+      { riderId },
       token,
     );
     setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
@@ -843,6 +859,34 @@ function OrdersTab({
                     >
                       Reject
                     </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {(order.status === "CONFIRMED" || order.status === "OUT_FOR_DELIVERY") && (
+              <div className="mt-2 pt-2 border-t border-[var(--color-border)]">
+                {order.riderId ? (
+                  <p className="text-xs text-[var(--color-emerald-700)] font-medium">
+                    ✓ Rider assigned
+                  </p>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <select
+                      defaultValue=""
+                      onChange={(e) => assignRider(order.id, e.target.value)}
+                      className="text-xs border border-[var(--color-border)] rounded-[10px] px-2 py-1.5 bg-white flex-1"
+                    >
+                      <option value="" disabled>
+                        {riders.length === 0 ? "No approved riders yet" : "Assign a rider..."}
+                      </option>
+                      {riders.map((r) => (
+                        <option key={r.userId} value={r.userId}>
+                          {r.user?.fullName} ({r.vehicleType})
+                          {r.avgRating ? ` · ★${Number(r.avgRating).toFixed(1)}` : ""}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 )}
               </div>

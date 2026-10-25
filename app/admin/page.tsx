@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
-import type { Organization, Product, Category, Order } from "@/lib/types";
+import type { Organization, Product, Category, Order, RiderProfile } from "@/lib/types";
 
 interface AdminStats {
   totalUsers: number;
@@ -18,7 +18,7 @@ interface AdminStats {
   pendingPaymentVerifications: number;
 }
 
-type Tab = "pending" | "vendors" | "catalog" | "categories" | "orders";
+type Tab = "pending" | "vendors" | "catalog" | "categories" | "orders" | "riders";
 
 const inputClass =
   "border border-[var(--color-border)] rounded-[10px] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]";
@@ -34,6 +34,8 @@ export default function AdminPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderSearch, setOrderSearch] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState("ALL");
+  const [pendingRiders, setPendingRiders] = useState<RiderProfile[]>([]);
+  const [approvedRiders, setApprovedRiders] = useState<RiderProfile[]>([]);
   const [catalogSearch, setCatalogSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("pending");
@@ -58,16 +60,32 @@ export default function AdminPage() {
       api.get<Product[]>("/products/admin/all", token),
       api.get<Category[]>("/categories"),
       api.get<Order[]>("/admin/orders", token),
+      api.get<RiderProfile[]>("/riders/pending", token),
+      api.get<RiderProfile[]>("/riders/approved", token),
     ])
-      .then(([p, v, s, c, cat, ord]) => {
+      .then(([p, v, s, c, cat, ord, pendRiders, apprRiders]) => {
         setPending(p);
         setAllVendors(v);
         setStats(s);
         setCatalog(c);
         setCategories(cat);
         setOrders(ord);
+        setPendingRiders(pendRiders);
+        setApprovedRiders(apprRiders);
       })
       .finally(() => setLoading(false));
+  }
+
+  async function approveRider(id: string) {
+    if (!token) return;
+    await api.patch(`/riders/${id}/approve`, {}, token);
+    loadAll();
+  }
+
+  async function rejectRider(id: string) {
+    if (!token) return;
+    await api.patch(`/riders/${id}/reject`, {}, token);
+    loadAll();
   }
 
   async function approve(id: string) {
@@ -144,6 +162,7 @@ export default function AdminPage() {
           <TabButton active={tab === "catalog"} onClick={() => setTab("catalog")} label={`Product catalog (${catalog.length})`} />
           <TabButton active={tab === "orders"} onClick={() => setTab("orders")} label={`Orders (${orders.length})`} />
           <TabButton active={tab === "categories"} onClick={() => setTab("categories")} label={`Categories (${categories.length})`} />
+          <TabButton active={tab === "riders"} onClick={() => setTab("riders")} label={`Riders (${pendingRiders.length} pending)`} />
         </div>
 
         {tab === "pending" && (
@@ -387,6 +406,88 @@ export default function AdminPage() {
               ))}
               {categories.length === 0 && (
                 <p className="text-sm text-[var(--color-ink-500)]">No categories yet — add one above.</p>
+              )}
+            </div>
+          </div>
+        )}
+        {tab === "riders" && (
+          <div>
+            <h3 className="font-display font-semibold text-[var(--color-ink-900)] mb-3">
+              Pending applications ({pendingRiders.length})
+            </h3>
+            <div className="space-y-2 mb-8">
+              {pendingRiders.length === 0 && (
+                <p className="text-sm text-[var(--color-ink-500)]">
+                  No rider applications waiting for review.
+                </p>
+              )}
+              {pendingRiders.map((r) => (
+                <div
+                  key={r.id}
+                  className="bg-white rounded-[var(--radius-card)] shadow-card p-4 flex items-center justify-between flex-wrap gap-2"
+                >
+                  <div>
+                    <p className="font-semibold text-[var(--color-ink-900)]">
+                      {r.user?.fullName}
+                    </p>
+                    <p className="text-sm text-[var(--color-ink-500)]">
+                      {r.vehicleType} · {r.coverageArea} · {r.user?.phone}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => approveRider(r.id)}
+                      className="bg-[var(--color-emerald-700)] text-white px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => rejectRider(r.id)}
+                      className="bg-red-50 text-red-700 px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-red-100 transition-colors"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <h3 className="font-display font-semibold text-[var(--color-ink-900)] mb-3">
+              Active riders ({approvedRiders.length})
+            </h3>
+            <div className="bg-white rounded-[var(--radius-card)] shadow-card overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[var(--color-ink-500)] border-b border-[var(--color-border)]">
+                    <th className="px-4 py-3 font-medium">Rider</th>
+                    <th className="px-4 py-3 font-medium">Vehicle</th>
+                    <th className="px-4 py-3 font-medium">Coverage</th>
+                    <th className="px-4 py-3 font-medium">Rating</th>
+                    <th className="px-4 py-3 font-medium">Deliveries</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {approvedRiders.map((r) => (
+                    <tr key={r.id} className="border-b border-[var(--color-border)] last:border-0">
+                      <td className="px-4 py-3 font-medium text-[var(--color-ink-900)]">
+                        {r.user?.fullName}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--color-ink-500)]">{r.vehicleType}</td>
+                      <td className="px-4 py-3 text-[var(--color-ink-500)]">{r.coverageArea}</td>
+                      <td className="px-4 py-3 text-[var(--color-emerald-700)] font-medium">
+                        {r.avgRating ? `★ ${Number(r.avgRating).toFixed(1)}` : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--color-ink-500)]">
+                        {r.completedDeliveries}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {approvedRiders.length === 0 && (
+                <p className="text-sm text-[var(--color-ink-500)] p-6 text-center">
+                  No approved riders yet.
+                </p>
               )}
             </div>
           </div>

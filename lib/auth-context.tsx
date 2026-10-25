@@ -19,7 +19,7 @@ interface AuthContextValue {
     phone: string;
     password: string;
     fullName: string;
-    role?: "BUYER" | "VENDOR" | "PROVIDER";
+    role?: "BUYER" | "VENDOR" | "PROVIDER" | "RIDER";
     area?: string;
     ward?: string;
   }) => Promise<void>;
@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     phone: string;
     password: string;
     fullName: string;
-    role?: "BUYER" | "VENDOR" | "PROVIDER";
+    role?: "BUYER" | "VENDOR" | "PROVIDER" | "RIDER";
     area?: string;
     ward?: string;
   }) {

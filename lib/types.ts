@@ -1,4 +1,4 @@
-export type UserRole = "BUYER" | "VENDOR" | "PROVIDER" | "ADMIN";
+export type UserRole = "BUYER" | "VENDOR" | "PROVIDER" | "ADMIN" | "RIDER";
 export type Vertical = "MARKETPLACE" | "PHARMACY" | "SERVICES";
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type OrderStatus =
@@ -104,6 +104,9 @@ export interface Order {
   paymentTrxId?: string | null;
   paymentVerification: PaymentVerificationStatus;
   paymentVerifiedAt?: string | null;
+  riderId?: string | null;
+  deliveryNote?: string | null;
+  deliveredAt?: string | null;
   createdAt: string;
   items: OrderItem[];
   organization?: Organization;
@@ -143,4 +146,16 @@ export interface MarketingCampaign {
   failedCount: number;
   createdAt: string;
   sentAt?: string | null;
+}
+
+export interface RiderProfile {
+  id: string;
+  userId: string;
+  vehicleType?: string | null;
+  coverageArea?: string | null;
+  approvalStatus: ApprovalStatus;
+  avgRating?: string | null;
+  completedDeliveries: number;
+  createdAt: string;
+  user?: User;
 }

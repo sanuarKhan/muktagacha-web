@@ -13,7 +13,7 @@ export default function RegisterPage() {
     phone: "",
     password: "",
     fullName: "",
-    role: "BUYER" as "BUYER" | "VENDOR",
+    role: "BUYER" as "BUYER" | "VENDOR" | "RIDER",
     area: "Muktagacha",
     ward: "",
   });
@@ -26,7 +26,9 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register(form);
-      router.push(form.role === "VENDOR" ? "/vendor" : "/");
+      router.push(
+        form.role === "VENDOR" ? "/vendor" : form.role === "RIDER" ? "/rider" : "/",
+      );
     } catch (err: any) {
       const msg = Array.isArray(err?.message)
         ? err.message.join(", ")
@@ -97,12 +99,13 @@ export default function RegisterPage() {
             <select
               value={form.role}
               onChange={(e) =>
-                setForm({ ...form, role: e.target.value as "BUYER" | "VENDOR" })
+                setForm({ ...form, role: e.target.value as "BUYER" | "VENDOR" | "RIDER" })
               }
               className={inputClass}
             >
               <option value="BUYER">Shop / order services</option>
               <option value="VENDOR">Sell products or offer services</option>
+              <option value="RIDER">Deliver orders (become a rider)</option>
             </select>
           </div>
           <div>

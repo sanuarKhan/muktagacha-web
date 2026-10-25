@@ -26,6 +26,7 @@ export default function OrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rated, setRated] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (authLoading) return;
@@ -38,6 +39,12 @@ export default function OrdersPage() {
       .then(setOrders)
       .finally(() => setLoading(false));
   }, [token, authLoading, router]);
+
+  async function rate(orderId: string, rating: number) {
+    if (!token) return;
+    await api.post(`/riders/orders/${orderId}/rate`, { rating }, token);
+    setRated((prev) => ({ ...prev, [orderId]: true }));
+  }
 
   if (authLoading || loading) {
     return <div className="max-w-2xl mx-auto px-4 py-12">Loading...</div>;
@@ -83,6 +90,27 @@ export default function OrdersPage() {
             {PAYMENT_STATUS_LABEL[order.paymentVerification] && (
               <p className="text-xs text-[var(--color-ink-500)] mt-2 pt-2 border-t border-[var(--color-border)]">
                 {PAYMENT_STATUS_LABEL[order.paymentVerification]}
+              </p>
+            )}
+            {order.status === "COMPLETED" && order.riderId && !rated[order.id] && (
+              <div className="mt-2 pt-2 border-t border-[var(--color-border)] flex items-center gap-1">
+                <span className="text-xs text-[var(--color-ink-500)] mr-1">
+                  Rate your delivery:
+                </span>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => rate(order.id, n)}
+                    className="text-lg text-[var(--color-gold-600)] hover:scale-110 transition-transform"
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            )}
+            {rated[order.id] && (
+              <p className="text-xs text-[var(--color-emerald-700)] mt-2 pt-2 border-t border-[var(--color-border)]">
+                Thanks for rating your delivery!
               </p>
             )}
           </div>
