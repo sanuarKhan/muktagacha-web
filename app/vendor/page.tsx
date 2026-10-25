@@ -394,7 +394,7 @@ function HomeTab({
                   {order.buyer?.fullName ?? "Buyer"}
                 </p>
                 <p className="text-xs text-[var(--color-ink-500)]">
-                  {order.items.length} item(s) · {order.paymentMethod}
+                  {order.items?.length ?? 0} item(s) · {order.paymentMethod}
                 </p>
               </div>
               <span className="text-xs text-[var(--color-ink-500)]">{order.status}</span>
@@ -815,7 +815,7 @@ function OrdersTab({
                   {order.buyer?.fullName ?? "Buyer"}
                 </p>
                 <p className="text-[var(--color-ink-500)] text-xs">
-                  {order.items.length} item(s) · {order.paymentMethod}
+                  {order.items?.length ?? 0} item(s) · {order.paymentMethod}
                 </p>
               </div>
               <select

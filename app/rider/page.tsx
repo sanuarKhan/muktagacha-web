@@ -233,7 +233,7 @@ function RiderDashboard({ profile, token }: { profile: RiderProfile; token: stri
                   {o.buyer?.area} {o.buyer?.ward ? `· ${o.buyer.ward}` : ""}
                 </p>
                 <p className="text-xs text-[var(--color-ink-500)] mt-1">
-                  {o.items.length} item(s) · {o.paymentMethod.replace(/_/g, " ")}
+                  {o.items?.length ?? 0} item(s) · {o.paymentMethod.replace(/_/g, " ")}
                 </p>
                 <div className="mt-3 flex gap-2">
                   <input
