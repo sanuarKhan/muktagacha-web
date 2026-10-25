@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import type { Order } from "@/lib/types";
@@ -87,6 +88,12 @@ export default function OrdersPage() {
                 </div>
               ))}
             </div>
+            <Link
+              href={`/orders/${order.id}`}
+              className="text-xs text-[var(--color-emerald-700)] font-medium hover:underline mt-2 inline-block"
+            >
+              View receipt →
+            </Link>
             {PAYMENT_STATUS_LABEL[order.paymentVerification] && (
               <p className="text-xs text-[var(--color-ink-500)] mt-2 pt-2 border-t border-[var(--color-border)]">
                 {PAYMENT_STATUS_LABEL[order.paymentVerification]}

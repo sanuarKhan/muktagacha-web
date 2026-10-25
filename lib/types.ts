@@ -105,6 +105,7 @@ export interface Order {
   paymentVerification: PaymentVerificationStatus;
   paymentVerifiedAt?: string | null;
   riderId?: string | null;
+  rider?: { fullName: string; phone: string } | null;
   deliveryNote?: string | null;
   deliveredAt?: string | null;
   createdAt: string;
