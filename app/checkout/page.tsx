@@ -67,7 +67,6 @@ export default function CheckoutPage() {
               productId: l.product.id,
               variantId: l.variant?.id,
               quantity: l.quantity,
-              price: Number(l.variant?.priceOverride ?? l.product.basePrice),
             })),
           },
           token,
