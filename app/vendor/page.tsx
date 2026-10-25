@@ -906,6 +906,7 @@ function MarketingTab({ org, token }: { org: Organization; token: string }) {
   const [loading, setLoading] = useState(true);
   const [bulkText, setBulkText] = useState("");
   const [addingContacts, setAddingContacts] = useState(false);
+  const [csvMessage, setCsvMessage] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<MarketingCampaign | null>(null);
@@ -936,18 +937,70 @@ function MarketingTab({ org, token }: { org: Organization; token: string }) {
       return { phone: phone.trim(), name: rest.join(",").trim() || undefined };
     });
     if (parsed.length === 0) return;
+    await submitContacts(parsed);
+    setBulkText("");
+  }
+
+  async function submitContacts(
+    parsed: { phone: string; name?: string }[],
+  ) {
+    if (parsed.length === 0) return;
     setAddingContacts(true);
     try {
-      await api.post(`/organizations/${org.id}/marketing/contacts`, { contacts: parsed }, token);
+      const result = await api.post<{ added: number; skipped: number }>(
+        `/organizations/${org.id}/marketing/contacts`,
+        { contacts: parsed },
+        token,
+      );
       const refreshed = await api.get<MarketingContact[]>(
         `/organizations/${org.id}/marketing/contacts`,
         token,
       );
       setContacts(refreshed);
-      setBulkText("");
+      setCsvMessage(
+        `Added/updated ${result.added} contact(s)${
+          result.skipped > 0 ? `, skipped ${result.skipped} invalid row(s)` : ""
+        }.`,
+      );
     } finally {
       setAddingContacts(false);
     }
+  }
+
+  // Accepts a plain .csv (phone,name per row - header row optional and
+  // auto-skipped if the first cell isn't a phone-looking string) or a
+  // .txt export. Handles the common "phone,name" and "name,phone" column
+  // orders by picking whichever cell looks like a phone number.
+  function handleCsvFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const text = String(reader.result ?? "");
+      const rows = text
+        .split(/\r?\n/)
+        .map((r) => r.trim())
+        .filter(Boolean);
+
+      const looksLikePhone = (s: string) => /\d{6,}/.test(s.replace(/\D/g, ""));
+
+      const parsed: { phone: string; name?: string }[] = [];
+      for (const row of rows) {
+        const cells = row.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+        const phoneCell = cells.find((c) => looksLikePhone(c));
+        if (!phoneCell) continue; // header row or junk line - skip silently
+        const nameCell = cells.find((c) => c && c !== phoneCell);
+        parsed.push({ phone: phoneCell, name: nameCell || undefined });
+      }
+
+      if (parsed.length === 0) {
+        setCsvMessage("Couldn't find any phone numbers in that file.");
+        return;
+      }
+      await submitContacts(parsed);
+    };
+    reader.readAsText(file);
+    e.target.value = ""; // allow re-uploading the same file name
   }
 
   async function removeContact(id: string) {
@@ -1017,6 +1070,26 @@ function MarketingTab({ org, token }: { org: Organization; token: string }) {
               {addingContacts ? "Adding..." : "Add to list"}
             </button>
           </form>
+
+          <div className="bg-white rounded-[var(--radius-card)] shadow-card p-4 mb-4">
+            <label className={labelClass}>Or upload a CSV / contact export</label>
+            <input
+              type="file"
+              accept=".csv,.txt"
+              onChange={handleCsvFile}
+              disabled={addingContacts}
+              className="text-sm text-[var(--color-ink-700)] file:mr-3 file:rounded-full file:border-0 file:bg-[var(--color-emerald-50)] file:text-[var(--color-emerald-700)] file:px-3 file:py-1.5 file:text-xs file:font-medium"
+            />
+            <p className="text-xs text-[var(--color-ink-300)] mt-1.5">
+              Any .csv with a phone number column (name column optional) —
+              exported from your phone, Excel, or Google Contacts.
+            </p>
+            {csvMessage && (
+              <p className="text-xs text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] rounded-lg px-3 py-2 mt-2">
+                {csvMessage}
+              </p>
+            )}
+          </div>
 
           <div className="bg-white rounded-[var(--radius-card)] shadow-card divide-y divide-[var(--color-border)] max-h-72 overflow-y-auto">
             {contacts.length === 0 && (
