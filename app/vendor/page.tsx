@@ -514,7 +514,7 @@ function ProductsTab({
         {filtered.map((p) => (
           <div
             key={p.id}
-            className="rounded-[14px] border border-[var(--color-border)] overflow-hidden bg-white"
+            className="rounded-[16px] border border-[var(--color-border)] overflow-hidden bg-white shadow-card hover:shadow-hover-card transition-shadow"
           >
             <div className="relative aspect-square bg-[var(--color-cream-100)]">
               {p.images?.[0]?.url ? (
@@ -681,151 +681,197 @@ function ProductForm({
   return (
     <form
       onSubmit={save}
-      className="bg-white rounded-[var(--radius-card)] shadow-card p-5 space-y-3 max-w-sm mb-6"
+      className="bg-white rounded-[var(--radius-card)] shadow-elevated p-6 sm:p-8 max-w-lg mb-6 border border-[var(--color-border)]"
     >
-      <h3 className="font-display font-semibold text-[var(--color-ink-900)]">
-        {isEdit ? "Edit product" : "Add product"}
-      </h3>
+      <div className="mb-6 pb-5 border-b border-[var(--color-border)]">
+        <h3 className="font-display text-xl font-semibold text-[var(--color-ink-900)]">
+          {isEdit ? "Edit product" : "Add a new product"}
+        </h3>
+        <p className="text-sm text-[var(--color-ink-500)] mt-1">
+          {isEdit
+            ? "Update the details below — changes go live as soon as you save."
+            : "Fill in the details below. You can always come back and edit this later."}
+        </p>
+      </div>
 
-      <div>
-        <label className={labelClass}>Photos (first one is the main photo)</label>
-        <div className="flex flex-wrap gap-2">
+      <div className="mb-6">
+        <label className={labelClass}>Photos</label>
+        <p className="text-xs text-[var(--color-ink-500)] mb-2.5">
+          The first photo is what customers see first. Add a few angles if you can —
+          listings with more than one photo build more trust.
+        </p>
+        <div className="flex flex-wrap gap-3">
           {images.map((url, i) => (
-            <ImageUploadField
-              key={i}
-              value={url || null}
-              onChange={(u) => setImageAt(i, u)}
-              label=""
-              size="sm"
-              getUploadSignature={getUploadSignature}
-              onRemove={() => removeImageAt(i)}
-            />
-          ))}
-          <button
-            type="button"
-            onClick={addImageSlot}
-            className="w-20 h-20 rounded-[12px] border-2 border-dashed border-[var(--color-border)] flex items-center justify-center text-[var(--color-ink-300)] text-2xl hover:border-[var(--color-emerald-600)] hover:text-[var(--color-emerald-600)] transition-colors"
-          >
-            +
-          </button>
-        </div>
-      </div>
-
-      <input
-        required
-        placeholder="Product name"
-        value={form.name}
-        onChange={(e) => setForm({ ...form, name: e.target.value })}
-        className={inputClass}
-      />
-      <textarea
-        placeholder="Short description (optional)"
-        value={form.description}
-        onChange={(e) => setForm({ ...form, description: e.target.value })}
-        rows={2}
-        className={inputClass}
-      />
-      <div>
-        <label className={labelClass}>Category</label>
-        <select
-          value={form.categoryId}
-          onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-          className={inputClass}
-        >
-          <option value="">Select a category</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        {categories.length === 0 && (
-          <p className="text-xs text-[var(--color-ink-300)] mt-1">
-            No categories set up yet for this shop type — ask the admin
-            to add one, or leave blank for now.
-          </p>
-        )}
-      </div>
-      <input
-        required
-        type="number"
-        placeholder={hasVariants ? "Starting price (৳)" : "Price (৳)"}
-        value={form.basePrice}
-        onChange={(e) => setForm({ ...form, basePrice: e.target.value })}
-        className={inputClass}
-      />
-
-      <label className="flex items-center gap-2 text-sm text-[var(--color-ink-700)]">
-        <input
-          type="checkbox"
-          checked={hasVariants}
-          onChange={(e) => setHasVariants(e.target.checked)}
-        />
-        This product comes in different sizes/colors
-      </label>
-
-      {hasVariants && (
-        <div className="space-y-2 bg-[var(--color-cream-100)] rounded-[12px] p-3">
-          <p className="text-xs text-[var(--color-ink-500)]">
-            Add each size/color combination you stock, with its own
-            quantity. Leave price blank to use the base price above.
-          </p>
-          {variants.map((v, i) => (
-            <div key={i} className="flex gap-1.5 items-center">
-              <input
-                placeholder="Size"
-                value={v.size}
-                onChange={(e) => updateVariant(i, "size", e.target.value)}
-                className="w-16 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
+            <div key={i} className="relative">
+              {i === 0 && url && (
+                <span className="absolute -top-2 left-1.5 z-10 bg-[var(--color-emerald-700)] text-white text-[9px] font-medium px-1.5 py-0.5 rounded-full">
+                  Main
+                </span>
+              )}
+              <ImageUploadField
+                value={url || null}
+                onChange={(u) => setImageAt(i, u)}
+                label=""
+                size="sm"
+                getUploadSignature={getUploadSignature}
+                onRemove={() => removeImageAt(i)}
               />
-              <input
-                placeholder="Color"
-                value={v.color}
-                onChange={(e) => updateVariant(i, "color", e.target.value)}
-                className="w-20 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
-              />
-              <input
-                type="number"
-                placeholder="Qty"
-                value={v.stockCount}
-                onChange={(e) => updateVariant(i, "stockCount", e.target.value)}
-                className="w-16 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
-              />
-              <input
-                type="number"
-                placeholder="৳ (opt.)"
-                value={v.priceOverride}
-                onChange={(e) => updateVariant(i, "priceOverride", e.target.value)}
-                className="w-20 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => removeVariantRow(i)}
-                className="text-[var(--color-ink-300)] hover:text-red-600 text-sm px-1"
-              >
-                ✕
-              </button>
             </div>
           ))}
           <button
             type="button"
-            onClick={addVariantRow}
-            className="text-xs text-[var(--color-emerald-700)] font-medium"
+            onClick={addImageSlot}
+            className="w-20 h-20 rounded-[14px] border-2 border-dashed border-[var(--color-border)] flex flex-col items-center justify-center gap-0.5 text-[var(--color-ink-300)] hover:border-[var(--color-emerald-600)] hover:text-[var(--color-emerald-600)] hover:bg-[var(--color-emerald-50)] transition-colors"
           >
-            + Add another combination
+            <span className="text-xl leading-none">+</span>
+            <span className="text-[10px] font-medium">Add photo</span>
           </button>
         </div>
-      )}
+      </div>
 
-      <div className="flex gap-2">
+      <div className="space-y-4">
+        <div>
+          <label className={labelClass}>Product name</label>
+          <input
+            required
+            placeholder="e.g. Men's Cotton Panjabi"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+
+        <div>
+          <label className={labelClass}>Description (optional)</label>
+          <textarea
+            placeholder="A short, honest description of the product..."
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            rows={2}
+            className={inputClass}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Category</label>
+            <select
+              value={form.categoryId}
+              onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+              className={inputClass}
+            >
+              <option value="">Select a category</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>{hasVariants ? "Starting price" : "Price"}</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-ink-500)] text-sm">
+                ৳
+              </span>
+              <input
+                required
+                type="number"
+                placeholder="0"
+                value={form.basePrice}
+                onChange={(e) => setForm({ ...form, basePrice: e.target.value })}
+                className={`${inputClass} pl-8`}
+              />
+            </div>
+          </div>
+        </div>
+        {categories.length === 0 && (
+          <p className="text-xs text-[var(--color-ink-300)] -mt-2">
+            No categories set up yet for this shop type — ask the admin
+            to add one, or leave blank for now.
+          </p>
+        )}
+
+        <label className="flex items-center gap-2.5 text-sm text-[var(--color-ink-700)] bg-[var(--color-cream-100)] rounded-[12px] px-4 py-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={hasVariants}
+            onChange={(e) => setHasVariants(e.target.checked)}
+            className="w-4 h-4 accent-[var(--color-emerald-700)]"
+          />
+          This product comes in different sizes or colors
+        </label>
+
+        {hasVariants && (
+          <div className="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-cream-100)]/60 p-4 space-y-3">
+            <p className="text-xs text-[var(--color-ink-500)]">
+              Add each size/color combination you stock, with its own quantity.
+              Leave price blank to use the price above.
+            </p>
+            {variants.map((v, i) => (
+              <div
+                key={i}
+                className="bg-white rounded-[12px] border border-[var(--color-border)] p-3 flex flex-wrap items-center gap-2"
+              >
+                <input
+                  placeholder="Size"
+                  value={v.size}
+                  onChange={(e) => updateVariant(i, "size", e.target.value)}
+                  className="w-20 border border-[var(--color-border)] rounded-[8px] px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]"
+                />
+                <input
+                  placeholder="Color"
+                  value={v.color}
+                  onChange={(e) => updateVariant(i, "color", e.target.value)}
+                  className="w-24 border border-[var(--color-border)] rounded-[8px] px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]"
+                />
+                <input
+                  type="number"
+                  placeholder="Qty"
+                  value={v.stockCount}
+                  onChange={(e) => updateVariant(i, "stockCount", e.target.value)}
+                  className="w-20 border border-[var(--color-border)] rounded-[8px] px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]"
+                />
+                <input
+                  type="number"
+                  placeholder="৳ (opt.)"
+                  value={v.priceOverride}
+                  onChange={(e) => updateVariant(i, "priceOverride", e.target.value)}
+                  className="w-24 border border-[var(--color-border)] rounded-[8px] px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeVariantRow(i)}
+                  className="ml-auto text-[var(--color-ink-300)] hover:text-red-600 text-sm w-7 h-7 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addVariantRow}
+              className="text-xs text-[var(--color-emerald-700)] font-semibold hover:text-[var(--color-emerald-900)]"
+            >
+              + Add another combination
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-3 mt-7 pt-5 border-t border-[var(--color-border)]">
         <button
           type="submit"
           disabled={saving}
-          className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-5 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] disabled:opacity-50"
+          className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-6 py-2.5 text-sm font-semibold hover:bg-[var(--color-emerald-900)] disabled:opacity-50 shadow-sm"
         >
           {saving ? "Saving..." : isEdit ? "Save changes" : "Save product"}
         </button>
-        <button type="button" onClick={onCancel} className="text-sm text-[var(--color-ink-500)] px-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-sm text-[var(--color-ink-500)] px-4 hover:text-[var(--color-ink-900)]"
+        >
           Cancel
         </button>
       </div>
