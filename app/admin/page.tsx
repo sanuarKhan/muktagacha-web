@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
-import type { Organization, Product, Category } from "@/lib/types";
+import type { Organization, Product, Category, Order } from "@/lib/types";
 
 interface AdminStats {
   totalUsers: number;
@@ -18,7 +18,7 @@ interface AdminStats {
   pendingPaymentVerifications: number;
 }
 
-type Tab = "pending" | "vendors" | "catalog" | "categories";
+type Tab = "pending" | "vendors" | "catalog" | "categories" | "orders";
 
 const inputClass =
   "border border-[var(--color-border)] rounded-[10px] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]";
@@ -31,6 +31,9 @@ export default function AdminPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [catalog, setCatalog] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [orderSearch, setOrderSearch] = useState("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState("ALL");
   const [catalogSearch, setCatalogSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("pending");
@@ -54,13 +57,15 @@ export default function AdminPage() {
       api.get<AdminStats>("/admin/stats", token),
       api.get<Product[]>("/products/admin/all", token),
       api.get<Category[]>("/categories"),
+      api.get<Order[]>("/admin/orders", token),
     ])
-      .then(([p, v, s, c, cat]) => {
+      .then(([p, v, s, c, cat, ord]) => {
         setPending(p);
         setAllVendors(v);
         setStats(s);
         setCatalog(c);
         setCategories(cat);
+        setOrders(ord);
       })
       .finally(() => setLoading(false));
   }
@@ -137,6 +142,7 @@ export default function AdminPage() {
           <TabButton active={tab === "pending"} onClick={() => setTab("pending")} label={`Pending approval (${pending.length})`} />
           <TabButton active={tab === "vendors"} onClick={() => setTab("vendors")} label={`All vendors (${allVendors.length})`} />
           <TabButton active={tab === "catalog"} onClick={() => setTab("catalog")} label={`Product catalog (${catalog.length})`} />
+          <TabButton active={tab === "orders"} onClick={() => setTab("orders")} label={`Orders (${orders.length})`} />
           <TabButton active={tab === "categories"} onClick={() => setTab("categories")} label={`Categories (${categories.length})`} />
         </div>
 
@@ -240,6 +246,97 @@ export default function AdminPage() {
               </table>
               {filteredCatalog.length === 0 && (
                 <p className="text-sm text-[var(--color-ink-500)] p-6 text-center">No products found.</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === "orders" && (
+          <div>
+            <div className="flex gap-3 mb-4 flex-wrap items-end">
+              <input
+                placeholder="Search by buyer name or vendor..."
+                value={orderSearch}
+                onChange={(e) => setOrderSearch(e.target.value)}
+                className={`${inputClass} w-full max-w-sm`}
+              />
+              <select
+                value={orderStatusFilter}
+                onChange={(e) => setOrderStatusFilter(e.target.value)}
+                className={inputClass}
+              >
+                <option value="ALL">All statuses</option>
+                <option value="PENDING">Pending</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="OUT_FOR_DELIVERY">Out for delivery</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+            </div>
+            <div className="bg-white rounded-[var(--radius-card)] shadow-card overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[var(--color-ink-500)] border-b border-[var(--color-border)]">
+                    <th className="px-4 py-3 font-medium">Buyer</th>
+                    <th className="px-4 py-3 font-medium">Vendor</th>
+                    <th className="px-4 py-3 font-medium">Items</th>
+                    <th className="px-4 py-3 font-medium">Total</th>
+                    <th className="px-4 py-3 font-medium">Payment</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders
+                    .filter((o) => orderStatusFilter === "ALL" || o.status === orderStatusFilter)
+                    .filter(
+                      (o) =>
+                        !orderSearch ||
+                        o.buyer?.fullName?.toLowerCase().includes(orderSearch.toLowerCase()) ||
+                        o.organization?.name?.toLowerCase().includes(orderSearch.toLowerCase()),
+                    )
+                    .map((o) => {
+                      const total = o.items.reduce(
+                        (s, it) => s + Number(it.price) * it.quantity,
+                        0,
+                      );
+                      return (
+                        <tr key={o.id} className="border-b border-[var(--color-border)] last:border-0">
+                          <td className="px-4 py-3 text-[var(--color-ink-900)]">
+                            {o.buyer?.fullName ?? "—"}
+                          </td>
+                          <td className="px-4 py-3 text-[var(--color-ink-500)]">
+                            {o.organization?.name ?? "—"}
+                          </td>
+                          <td className="px-4 py-3 text-[var(--color-ink-500)]">{o.items.length}</td>
+                          <td className="px-4 py-3 text-[var(--color-emerald-700)] font-medium">
+                            ৳{total}
+                          </td>
+                          <td className="px-4 py-3 text-[var(--color-ink-500)]">
+                            {o.paymentMethod.replace(/_/g, " ")}
+                            {o.paymentMethod !== "CASH_ON_DELIVERY" && (
+                              <span className="block text-xs">
+                                {o.paymentVerification.replace(/_/g, " ")}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-[var(--color-cream-100)] text-[var(--color-ink-700)]">
+                              {o.status.replace(/_/g, " ")}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-[var(--color-ink-300)]">
+                            {new Date(o.createdAt).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+              {orders.length === 0 && (
+                <p className="text-sm text-[var(--color-ink-500)] p-6 text-center">
+                  No orders yet.
+                </p>
               )}
             </div>
           </div>
