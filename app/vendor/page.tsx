@@ -69,86 +69,77 @@ export default function VendorPage() {
     );
   }
 
+  if (orgs.length === 0) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] bg-[var(--color-cream-100)] flex items-center justify-center px-5 py-10">
+        <form
+          onSubmit={createOrg}
+          className="bg-white rounded-[var(--radius-card)] shadow-card p-6 space-y-4 max-w-md w-full"
+        >
+          <h1 className="font-display text-2xl font-semibold text-[var(--color-ink-900)]">
+            Open your shop
+          </h1>
+          <p className="text-sm text-[var(--color-ink-500)]">
+            Create your storefront — it will need admin approval before it
+            goes live to customers.
+          </p>
+          <ImageUploadField
+            value={orgForm.logoUrl}
+            onChange={(url) => setOrgForm({ ...orgForm, logoUrl: url })}
+            label="Shop photo"
+          />
+          <div>
+            <label className={labelClass}>Store name</label>
+            <input
+              required
+              placeholder="e.g. Rahim's Clothing Store"
+              value={orgForm.name}
+              onChange={(e) => setOrgForm({ ...orgForm, name: e.target.value })}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>What do you sell?</label>
+            <select
+              value={orgForm.vertical}
+              onChange={(e) =>
+                setOrgForm({ ...orgForm, vertical: e.target.value as Vertical })
+              }
+              className={inputClass}
+            >
+              <option value="MARKETPLACE">Marketplace (products)</option>
+              <option value="PHARMACY">Pharmacy</option>
+              <option value="SERVICES">Services</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Ward</label>
+            <input
+              placeholder="e.g. Ward 3"
+              value={orgForm.ward}
+              onChange={(e) => setOrgForm({ ...orgForm, ward: e.target.value })}
+              className={inputClass}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={creatingOrg}
+            className="w-full bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-6 py-2.5 font-medium hover:bg-[var(--color-emerald-900)] transition-colors disabled:opacity-50"
+          >
+            {creatingOrg ? "Creating..." : "Create storefront"}
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  // Most vendors have exactly one shop. If someone has more than one, each
+  // gets its own full dashboard shell, stacked.
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[var(--color-cream-100)]">
-      <div className="max-w-4xl mx-auto px-5 py-10">
-        <h1 className="font-display text-3xl font-semibold text-[var(--color-ink-900)] mb-1">
-          My Store
-        </h1>
-        <p className="text-[var(--color-ink-500)] mb-8">
-          Manage your storefront, products, and orders.
-        </p>
-
-        {orgs.length === 0 && (
-          <form
-            onSubmit={createOrg}
-            className="bg-white rounded-[var(--radius-card)] shadow-card p-6 space-y-4 max-w-md"
-          >
-            <p className="text-sm text-[var(--color-ink-500)]">
-              You don't have a storefront yet. Create one — it will need
-              admin approval before it goes live.
-            </p>
-            <ImageUploadField
-              value={orgForm.logoUrl}
-              onChange={(url) => setOrgForm({ ...orgForm, logoUrl: url })}
-              label="Shop photo"
-            />
-            <div>
-              <label className={labelClass}>Store name</label>
-              <input
-                required
-                placeholder="e.g. Rahim's Clothing Store"
-                value={orgForm.name}
-                onChange={(e) =>
-                  setOrgForm({ ...orgForm, name: e.target.value })
-                }
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>What do you sell?</label>
-              <select
-                value={orgForm.vertical}
-                onChange={(e) =>
-                  setOrgForm({
-                    ...orgForm,
-                    vertical: e.target.value as Vertical,
-                  })
-                }
-                className={inputClass}
-              >
-                <option value="MARKETPLACE">Marketplace (products)</option>
-                <option value="PHARMACY">Pharmacy</option>
-                <option value="SERVICES">Services</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Ward</label>
-              <input
-                placeholder="e.g. Ward 3"
-                value={orgForm.ward}
-                onChange={(e) =>
-                  setOrgForm({ ...orgForm, ward: e.target.value })
-                }
-                className={inputClass}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={creatingOrg}
-              className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-6 py-2.5 font-medium hover:bg-[var(--color-emerald-900)] transition-colors disabled:opacity-50"
-            >
-              {creatingOrg ? "Creating..." : "Create storefront"}
-            </button>
-          </form>
-        )}
-
-        <div className="space-y-6">
-          {orgs.map((org) => (
-            <VendorOrgPanel key={org.id} org={org} token={token!} />
-          ))}
-        </div>
-      </div>
+      {orgs.map((org) => (
+        <VendorDashboard key={org.id} org={org} token={token!} />
+      ))}
     </div>
   );
 }
@@ -173,18 +164,277 @@ type VariantDraft = {
   priceOverride: string;
 };
 
-function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
+type Tab = "home" | "products" | "orders" | "settings";
+
+const NAV_ITEMS: { id: Tab; label: string; icon: string }[] = [
+  { id: "home", label: "Home", icon: "●" },
+  { id: "products", label: "Products", icon: "▦" },
+  { id: "orders", label: "Orders", icon: "▤" },
+  { id: "settings", label: "Settings", icon: "⚙" },
+];
+
+function VendorDashboard({ org, token }: { org: Organization; token: string }) {
+  const [tab, setTab] = useState<Tab>("home");
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [showAddProduct, setShowAddProduct] = useState(false);
-  const [showPaymentSettings, setShowPaymentSettings] = useState(false);
-  const [paymentNumbers, setPaymentNumbers] = useState({
-    bkashNumber: org.bkashNumber ?? "",
-    nagadNumber: org.nagadNumber ?? "",
-  });
-  const [savingPayment, setSavingPayment] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
 
+  useEffect(() => {
+    Promise.all([
+      api.get<Product[]>(`/products/organization/${org.id}`),
+      api.get<Order[]>(`/orders/organization/${org.id}`, token),
+      api.get<Category[]>(`/categories?vertical=${org.vertical}`),
+    ])
+      .then(([p, o, c]) => {
+        setProducts(p);
+        setOrders(o);
+        setCategories(c);
+      })
+      .finally(() => setLoadingData(false));
+  }, [org.id, org.vertical, token]);
+
+  const pendingOrders = orders.filter((o) => o.status === "PENDING").length;
+  const pendingPayments = orders.filter(
+    (o) => o.paymentVerification === "PENDING_VERIFICATION",
+  ).length;
+  const totalRevenue = orders
+    .filter((o) => o.status === "COMPLETED")
+    .reduce(
+      (sum, o) => sum + o.items.reduce((s, it) => s + Number(it.price) * it.quantity, 0),
+      0,
+    );
+
+  return (
+    <div className="max-w-6xl mx-auto px-5 py-8">
+      {/* Shop header */}
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
+        {org.logoUrl ? (
+          <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 border border-[var(--color-border)]">
+            <Image src={org.logoUrl} alt={org.name} fill className="object-cover" unoptimized />
+          </div>
+        ) : (
+          <div className="w-12 h-12 rounded-full bg-[var(--color-emerald-50)] flex items-center justify-center flex-shrink-0">
+            <span className="font-display font-semibold text-[var(--color-emerald-700)]">
+              {org.name[0]}
+            </span>
+          </div>
+        )}
+        <div className="flex-1">
+          <h1 className="font-display font-semibold text-xl text-[var(--color-ink-900)]">
+            {org.name}
+          </h1>
+          <span
+            className={`inline-block text-xs px-2.5 py-0.5 rounded-full font-medium ${STATUS_STYLE[org.approvalStatus]}`}
+          >
+            {org.approvalStatus}
+          </span>
+        </div>
+      </div>
+
+      {org.approvalStatus === "PENDING" && (
+        <p className="text-sm text-[var(--color-gold-600)] bg-[var(--color-gold-50)] rounded-lg px-3 py-2 mb-6">
+          Waiting for admin approval. You can still set everything up now —
+          it'll appear to customers once approved.
+        </p>
+      )}
+
+      {/* Dashboard shell: sidebar + content */}
+      <div className="flex gap-6 flex-col md:flex-row">
+        <aside className="md:w-48 flex-shrink-0">
+          <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-1 md:pb-0">
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setTab(item.id)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-[12px] text-sm font-medium whitespace-nowrap transition-colors text-left ${
+                  tab === item.id
+                    ? "bg-[var(--color-emerald-700)] text-white"
+                    : "text-[var(--color-ink-700)] hover:bg-white"
+                }`}
+              >
+                <span>{item.icon}</span>
+                {item.label}
+                {item.id === "orders" && pendingOrders > 0 && (
+                  <span
+                    className={`ml-auto text-xs rounded-full px-1.5 ${
+                      tab === item.id
+                        ? "bg-white/20"
+                        : "bg-[var(--color-gold-500)] text-white"
+                    }`}
+                  >
+                    {pendingOrders}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        <main className="flex-1 min-w-0">
+          {loadingData ? (
+            <p className="text-sm text-[var(--color-ink-500)]">Loading...</p>
+          ) : tab === "home" ? (
+            <HomeTab
+              products={products}
+              orders={orders}
+              pendingOrders={pendingOrders}
+              pendingPayments={pendingPayments}
+              totalRevenue={totalRevenue}
+              onGoTo={setTab}
+            />
+          ) : tab === "products" ? (
+            <ProductsTab
+              org={org}
+              token={token}
+              products={products}
+              setProducts={setProducts}
+              categories={categories}
+            />
+          ) : tab === "orders" ? (
+            <OrdersTab org={org} token={token} orders={orders} setOrders={setOrders} />
+          ) : (
+            <SettingsTab org={org} token={token} />
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  sub,
+  highlight,
+  onClick,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  highlight?: boolean;
+  onClick?: () => void;
+}) {
+  const Comp: any = onClick ? "button" : "div";
+  return (
+    <Comp
+      onClick={onClick}
+      className={`rounded-[var(--radius-card)] shadow-card p-4 text-left w-full ${
+        highlight ? "bg-[var(--color-gold-50)]" : "bg-white"
+      } ${onClick ? "hover:shadow-md transition-shadow" : ""}`}
+    >
+      <p className="text-xs text-[var(--color-ink-500)] mb-1">{label}</p>
+      <p className="font-display text-2xl font-semibold text-[var(--color-ink-900)]">
+        {value}
+      </p>
+      {sub && <p className="text-xs text-[var(--color-ink-300)] mt-0.5">{sub}</p>}
+    </Comp>
+  );
+}
+
+function HomeTab({
+  products,
+  orders,
+  pendingOrders,
+  pendingPayments,
+  totalRevenue,
+  onGoTo,
+}: {
+  products: Product[];
+  orders: Order[];
+  pendingOrders: number;
+  pendingPayments: number;
+  totalRevenue: number;
+  onGoTo: (tab: Tab) => void;
+}) {
+  const recentOrders = [...orders]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5);
+
+  return (
+    <div>
+      <h2 className="font-display text-lg font-semibold text-[var(--color-ink-900)] mb-4">
+        Overview
+      </h2>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        <StatCard label="Products" value={products.length} onClick={() => onGoTo("products")} />
+        <StatCard
+          label="Orders to fulfill"
+          value={pendingOrders}
+          onClick={() => onGoTo("orders")}
+        />
+        <StatCard
+          label="Payments to verify"
+          value={pendingPayments}
+          highlight={pendingPayments > 0}
+          onClick={() => onGoTo("orders")}
+        />
+        <StatCard label="Revenue (completed)" value={`৳${totalRevenue}`} />
+      </div>
+
+      <h3 className="font-display font-semibold text-[var(--color-ink-900)] mb-3">
+        Recent orders
+      </h3>
+      {recentOrders.length === 0 ? (
+        <p className="text-sm text-[var(--color-ink-500)] bg-white rounded-[var(--radius-card)] shadow-card p-4">
+          No orders yet — once a customer buys from you, it'll show up here.
+        </p>
+      ) : (
+        <div className="bg-white rounded-[var(--radius-card)] shadow-card divide-y divide-[var(--color-border)]">
+          {recentOrders.map((order) => (
+            <div key={order.id} className="p-3 flex items-center justify-between text-sm">
+              <div>
+                <p className="font-medium text-[var(--color-ink-900)]">
+                  {order.buyer?.fullName ?? "Buyer"}
+                </p>
+                <p className="text-xs text-[var(--color-ink-500)]">
+                  {order.items.length} item(s) · {order.paymentMethod}
+                </p>
+              </div>
+              <span className="text-xs text-[var(--color-ink-500)]">{order.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Marketing placeholder — architecture slot for the planned SMS
+          campaign feature. Intentionally not built yet; this is a visible
+          reminder of where it will live once an SMS gateway is wired up. */}
+      <h3 className="font-display font-semibold text-[var(--color-ink-900)] mt-8 mb-3">
+        Marketing
+      </h3>
+      <div className="bg-white rounded-[var(--radius-card)] shadow-card p-4 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-[var(--color-ink-900)]">
+            SMS campaigns
+          </p>
+          <p className="text-xs text-[var(--color-ink-500)]">
+            Upload your customers' numbers and send them a promotional SMS.
+          </p>
+        </div>
+        <span className="text-xs bg-[var(--color-cream-100)] text-[var(--color-ink-500)] px-2.5 py-1 rounded-full font-medium">
+          Coming soon
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ProductsTab({
+  org,
+  token,
+  products,
+  setProducts,
+  categories,
+}: {
+  org: Organization;
+  token: string;
+  products: Product[];
+  setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
+  categories: Category[];
+}) {
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [search, setSearch] = useState("");
   const [hasVariants, setHasVariants] = useState(false);
   const [variants, setVariants] = useState<VariantDraft[]>([
     { size: "", color: "", stockCount: "", priceOverride: "" },
@@ -198,16 +448,6 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
   });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    api
-      .get<Product[]>(`/products/organization/${org.id}`)
-      .then(setProducts);
-    api.get<Order[]>(`/orders/organization/${org.id}`, token).then(setOrders);
-    api
-      .get<Category[]>(`/categories?vertical=${org.vertical}`)
-      .then(setCategories);
-  }, [org.id, org.vertical, token]);
-
   async function getUploadSignature(): Promise<CloudinaryUploadSignature> {
     return api.get<CloudinaryUploadSignature>(
       `/organizations/${org.id}/cloudinary/upload-signature`,
@@ -216,20 +456,13 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
   }
 
   function addVariantRow() {
-    setVariants((prev) => [
-      ...prev,
-      { size: "", color: "", stockCount: "", priceOverride: "" },
-    ]);
+    setVariants((prev) => [...prev, { size: "", color: "", stockCount: "", priceOverride: "" }]);
   }
-
   function removeVariantRow(index: number) {
     setVariants((prev) => prev.filter((_, i) => i !== index));
   }
-
   function updateVariant(index: number, field: keyof VariantDraft, value: string) {
-    setVariants((prev) =>
-      prev.map((v, i) => (i === index ? { ...v, [field]: value } : v)),
-    );
+    setVariants((prev) => prev.map((v, i) => (i === index ? { ...v, [field]: value } : v)));
   }
 
   async function addProduct(e: React.FormEvent) {
@@ -258,21 +491,13 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
           description: productForm.description || undefined,
           basePrice: Number(productForm.basePrice),
           hasVariants,
-          images: productForm.imageUrl
-            ? [{ url: productForm.imageUrl }]
-            : undefined,
+          images: productForm.imageUrl ? [{ url: productForm.imageUrl }] : undefined,
           variants: builtVariants.length ? builtVariants : undefined,
         },
         token,
       );
       setProducts((prev) => [...prev, product]);
-      setProductForm({
-        name: "",
-        description: "",
-        basePrice: "",
-        categoryId: "",
-        imageUrl: "",
-      });
+      setProductForm({ name: "", description: "", basePrice: "", categoryId: "", imageUrl: "" });
       setHasVariants(false);
       setVariants([{ size: "", color: "", stockCount: "", priceOverride: "" }]);
       setShowAddProduct(false);
@@ -286,180 +511,30 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
     setProducts((prev) => prev.filter((p) => p.id !== id));
   }
 
-  async function updateOrderStatus(orderId: string, status: string) {
-    const updated = await api.patch<Order>(
-      `/orders/${orderId}/status`,
-      { status },
-      token,
-    );
-    setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
-  }
-
-  async function verifyPayment(orderId: string, verification: "VERIFIED" | "REJECTED") {
-    const updated = await api.patch<Order>(
-      `/orders/${orderId}/verify-payment`,
-      { verification },
-      token,
-    );
-    setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
-  }
-
-  async function savePaymentNumbers(e: React.FormEvent) {
-    e.preventDefault();
-    setSavingPayment(true);
-    try {
-      await api.patch(`/organizations/${org.id}/payment-numbers`, paymentNumbers, token);
-      setShowPaymentSettings(false);
-    } finally {
-      setSavingPayment(false);
-    }
-  }
+  const filtered = search
+    ? products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
+    : products;
 
   return (
-    <div className="bg-white rounded-[var(--radius-card)] shadow-card p-6">
-      <div className="flex items-center gap-3 mb-5">
-        {org.logoUrl ? (
-          <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 border border-[var(--color-border)]">
-            <Image src={org.logoUrl} alt={org.name} fill className="object-cover" unoptimized />
-          </div>
-        ) : (
-          <div className="w-12 h-12 rounded-full bg-[var(--color-emerald-50)] flex items-center justify-center flex-shrink-0">
-            <span className="font-display font-semibold text-[var(--color-emerald-700)]">
-              {org.name[0]}
-            </span>
-          </div>
-        )}
-        <div className="flex-1">
-          <h2 className="font-display font-semibold text-lg text-[var(--color-ink-900)]">
-            {org.name}
-          </h2>
-          <span
-            className={`inline-block text-xs px-2.5 py-0.5 rounded-full font-medium ${STATUS_STYLE[org.approvalStatus]}`}
-          >
-            {org.approvalStatus}
-          </span>
-        </div>
-        <button
-          onClick={() => setShowPaymentSettings((s) => !s)}
-          className="text-sm text-[var(--color-emerald-700)] font-medium hover:underline"
-        >
-          Payment settings
-        </button>
-      </div>
-
-      {org.approvalStatus === "PENDING" && (
-        <p className="text-sm text-[var(--color-gold-600)] bg-[var(--color-gold-50)] rounded-lg px-3 py-2 mb-5">
-          Waiting for admin approval. You can still add products now — they'll
-          appear to customers once approved.
-        </p>
-      )}
-
-      {showPaymentSettings && (
-        <form
-          onSubmit={savePaymentNumbers}
-          className="rounded-[14px] border border-[var(--color-border)] p-4 space-y-3 mb-6 max-w-sm"
-        >
-          <p className="text-xs text-[var(--color-ink-500)]">
-            Buyers pay these numbers directly via the bKash/Nagad app, then
-            submit a transaction ID for you to confirm.
-          </p>
-          <div>
-            <label className={labelClass}>bKash number</label>
-            <input
-              placeholder="01XXXXXXXXX"
-              value={paymentNumbers.bkashNumber}
-              onChange={(e) =>
-                setPaymentNumbers({ ...paymentNumbers, bkashNumber: e.target.value })
-              }
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Nagad number</label>
-            <input
-              placeholder="01XXXXXXXXX"
-              value={paymentNumbers.nagadNumber}
-              onChange={(e) =>
-                setPaymentNumbers({ ...paymentNumbers, nagadNumber: e.target.value })
-              }
-              className={inputClass}
-            />
-          </div>
+    <div>
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <h2 className="font-display text-lg font-semibold text-[var(--color-ink-900)]">
+          Products ({products.length})
+        </h2>
+        {!showAddProduct && (
           <button
-            type="submit"
-            disabled={savingPayment}
-            className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-5 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] disabled:opacity-50"
+            onClick={() => setShowAddProduct(true)}
+            className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors"
           >
-            {savingPayment ? "Saving..." : "Save"}
+            + Add product
           </button>
-        </form>
-      )}
-
-      <h3 className="font-display font-semibold text-[var(--color-ink-900)] mb-3">
-        Products
-      </h3>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-        {products.map((p) => (
-          <div
-            key={p.id}
-            className="rounded-[14px] border border-[var(--color-border)] overflow-hidden bg-[var(--color-cream-50)]"
-          >
-            <div className="relative aspect-square bg-[var(--color-cream-100)]">
-              {p.images?.[0]?.url ? (
-                <Image
-                  src={p.images[0].url}
-                  alt={p.name}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-[var(--color-ink-300)] text-xs">
-                  No photo
-                </div>
-              )}
-            </div>
-            <div className="p-2.5">
-              <p className="text-sm font-medium text-[var(--color-ink-900)] truncate">
-                {p.name}
-              </p>
-              {p.hasVariants && (
-                <p className="text-xs text-[var(--color-ink-500)]">
-                  {p.variants.length} variant(s)
-                </p>
-              )}
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-sm font-semibold text-[var(--color-emerald-700)]">
-                  ৳{p.basePrice}
-                </span>
-                <button
-                  onClick={() => removeProduct(p.id)}
-                  className="text-xs text-[var(--color-ink-300)] hover:text-red-600"
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-        {products.length === 0 && (
-          <p className="text-sm text-[var(--color-ink-300)] col-span-full">
-            No products yet.
-          </p>
         )}
       </div>
 
-      {!showAddProduct ? (
-        <button
-          onClick={() => setShowAddProduct(true)}
-          className="text-sm text-[var(--color-emerald-700)] font-medium border border-[var(--color-emerald-600)] rounded-[var(--radius-pill)] px-4 py-2 hover:bg-[var(--color-emerald-50)] transition-colors"
-        >
-          + Add product
-        </button>
-      ) : (
+      {showAddProduct && (
         <form
           onSubmit={addProduct}
-          className="rounded-[14px] border border-[var(--color-border)] p-4 space-y-3 max-w-sm"
+          className="bg-white rounded-[var(--radius-card)] shadow-card p-5 space-y-3 max-w-sm mb-6"
         >
           <ImageUploadField
             value={productForm.imageUrl}
@@ -471,17 +546,13 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
             required
             placeholder="Product name"
             value={productForm.name}
-            onChange={(e) =>
-              setProductForm({ ...productForm, name: e.target.value })
-            }
+            onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
             className={inputClass}
           />
           <textarea
             placeholder="Short description (optional)"
             value={productForm.description}
-            onChange={(e) =>
-              setProductForm({ ...productForm, description: e.target.value })
-            }
+            onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
             rows={2}
             className={inputClass}
           />
@@ -489,9 +560,7 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
             <label className={labelClass}>Category</label>
             <select
               value={productForm.categoryId}
-              onChange={(e) =>
-                setProductForm({ ...productForm, categoryId: e.target.value })
-              }
+              onChange={(e) => setProductForm({ ...productForm, categoryId: e.target.value })}
               className={inputClass}
             >
               <option value="">Select a category</option>
@@ -513,9 +582,7 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
             type="number"
             placeholder={hasVariants ? "Starting price (৳)" : "Price (৳)"}
             value={productForm.basePrice}
-            onChange={(e) =>
-              setProductForm({ ...productForm, basePrice: e.target.value })
-            }
+            onChange={(e) => setProductForm({ ...productForm, basePrice: e.target.value })}
             className={inputClass}
           />
 
@@ -600,19 +667,128 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
         </form>
       )}
 
-      <h3 className="font-display font-semibold text-[var(--color-ink-900)] mt-8 mb-3">
-        Orders
-      </h3>
-      {orders.length === 0 && (
-        <p className="text-sm text-[var(--color-ink-300)]">No orders yet.</p>
+      {products.length > 0 && (
+        <input
+          placeholder="Search your products..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className={`${inputClass} max-w-sm mb-4`}
+        />
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {filtered.map((p) => (
+          <div
+            key={p.id}
+            className="rounded-[14px] border border-[var(--color-border)] overflow-hidden bg-white"
+          >
+            <div className="relative aspect-square bg-[var(--color-cream-100)]">
+              {p.images?.[0]?.url ? (
+                <Image src={p.images[0].url} alt={p.name} fill className="object-cover" unoptimized />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-[var(--color-ink-300)] text-xs">
+                  No photo
+                </div>
+              )}
+            </div>
+            <div className="p-2.5">
+              <p className="text-sm font-medium text-[var(--color-ink-900)] truncate">{p.name}</p>
+              {p.hasVariants && (
+                <p className="text-xs text-[var(--color-ink-500)]">{p.variants.length} variant(s)</p>
+              )}
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-sm font-semibold text-[var(--color-emerald-700)]">
+                  ৳{p.basePrice}
+                </span>
+                <button
+                  onClick={() => removeProduct(p.id)}
+                  className="text-xs text-[var(--color-ink-300)] hover:text-red-600"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && (
+          <p className="text-sm text-[var(--color-ink-300)] col-span-full">
+            {products.length === 0 ? "No products yet." : "No products match that search."}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OrdersTab({
+  org,
+  token,
+  orders,
+  setOrders,
+}: {
+  org: Organization;
+  token: string;
+  orders: Order[];
+  setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
+}) {
+  const [filter, setFilter] = useState<string>("ALL");
+
+  async function updateOrderStatus(orderId: string, status: string) {
+    const updated = await api.patch<Order>(`/orders/${orderId}/status`, { status }, token);
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+  }
+
+  async function verifyPayment(orderId: string, verification: "VERIFIED" | "REJECTED") {
+    const updated = await api.patch<Order>(
+      `/orders/${orderId}/verify-payment`,
+      { verification },
+      token,
+    );
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+  }
+
+  const FILTERS = ["ALL", "PENDING", "CONFIRMED", "OUT_FOR_DELIVERY", "COMPLETED", "CANCELLED"];
+  const filtered = filter === "ALL" ? orders : orders.filter((o) => o.status === filter);
+
+  return (
+    <div>
+      <h2 className="font-display text-lg font-semibold text-[var(--color-ink-900)] mb-4">
+        Orders ({orders.length})
+      </h2>
+
+      <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
+        {FILTERS.map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`text-xs px-3 py-1.5 rounded-full font-medium whitespace-nowrap transition-colors ${
+              filter === f
+                ? "bg-[var(--color-emerald-700)] text-white"
+                : "bg-white text-[var(--color-ink-500)] hover:bg-[var(--color-emerald-50)]"
+            }`}
+          >
+            {f.replace(/_/g, " ")}
+            {f !== "ALL" && (
+              <span className="ml-1 opacity-70">
+                ({orders.filter((o) => o.status === f).length})
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 && (
+        <p className="text-sm text-[var(--color-ink-300)] bg-white rounded-[var(--radius-card)] shadow-card p-4">
+          No orders in this view.
+        </p>
       )}
       <div className="space-y-2">
-        {orders.map((order) => (
+        {filtered.map((order) => (
           <div
             key={order.id}
-            className="rounded-[14px] border border-[var(--color-border)] p-3"
+            className="rounded-[14px] border border-[var(--color-border)] bg-white p-3"
           >
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="text-sm">
                 <p className="font-medium text-[var(--color-ink-900)]">
                   {order.buyer?.fullName ?? "Buyer"}
@@ -635,7 +811,7 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
             </div>
 
             {order.paymentMethod !== "CASH_ON_DELIVERY" && (
-              <div className="mt-2 pt-2 border-t border-[var(--color-border)] flex items-center justify-between">
+              <div className="mt-2 pt-2 border-t border-[var(--color-border)] flex items-center justify-between flex-wrap gap-2">
                 <div className="text-xs">
                   <span
                     className={`inline-block px-2 py-0.5 rounded-full font-medium mr-2 ${PAYMENT_VERIFICATION_STYLE[order.paymentVerification]}`}
@@ -669,6 +845,241 @@ function VendorOrgPanel({ org, token }: { org: Organization; token: string }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+type SettingsSection = "profile" | "payment" | "images";
+
+function SettingsTab({ org, token }: { org: Organization; token: string }) {
+  const [section, setSection] = useState<SettingsSection>("profile");
+
+  const [paymentNumbers, setPaymentNumbers] = useState({
+    bkashNumber: org.bkashNumber ?? "",
+    nagadNumber: org.nagadNumber ?? "",
+  });
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [paymentSaved, setPaymentSaved] = useState(false);
+
+  const [cloudinaryForm, setCloudinaryForm] = useState({
+    cloudName: "",
+    apiKey: "",
+    apiSecret: "",
+  });
+  const [savingCloudinary, setSavingCloudinary] = useState(false);
+  const [cloudinaryConnected, setCloudinaryConnected] = useState(
+    !!org.cloudinaryCloudName,
+  );
+  const [cloudinaryError, setCloudinaryError] = useState<string | null>(null);
+
+  async function savePaymentNumbers(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingPayment(true);
+    setPaymentSaved(false);
+    try {
+      await api.patch(`/organizations/${org.id}/payment-numbers`, paymentNumbers, token);
+      setPaymentSaved(true);
+    } finally {
+      setSavingPayment(false);
+    }
+  }
+
+  async function saveCloudinaryCredentials(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingCloudinary(true);
+    setCloudinaryError(null);
+    try {
+      await api.post(`/organizations/${org.id}/cloudinary`, cloudinaryForm, token);
+      setCloudinaryConnected(true);
+      setCloudinaryForm({ cloudName: "", apiKey: "", apiSecret: "" });
+    } catch (err: any) {
+      setCloudinaryError(
+        err?.message ?? "Could not save those credentials. Double-check them and try again.",
+      );
+    } finally {
+      setSavingCloudinary(false);
+    }
+  }
+
+  async function disconnectCloudinary() {
+    await api.delete(`/organizations/${org.id}/cloudinary`, token);
+    setCloudinaryConnected(false);
+  }
+
+  const SECTIONS: { id: SettingsSection; label: string }[] = [
+    { id: "profile", label: "Shop profile" },
+    { id: "payment", label: "Payment numbers" },
+    { id: "images", label: "Image uploads" },
+  ];
+
+  return (
+    <div>
+      <h2 className="font-display text-lg font-semibold text-[var(--color-ink-900)] mb-4">
+        Settings
+      </h2>
+
+      <div className="flex gap-1.5 mb-5 overflow-x-auto pb-1">
+        {SECTIONS.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => setSection(s.id)}
+            className={`text-sm px-3.5 py-1.5 rounded-full font-medium whitespace-nowrap transition-colors ${
+              section === s.id
+                ? "bg-[var(--color-emerald-700)] text-white"
+                : "bg-white text-[var(--color-ink-500)] hover:bg-[var(--color-emerald-50)]"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {section === "profile" && (
+        <div className="bg-white rounded-[var(--radius-card)] shadow-card p-5 max-w-sm space-y-2">
+          <p className="text-sm text-[var(--color-ink-700)]">
+            <span className="text-[var(--color-ink-500)]">Shop name:</span> {org.name}
+          </p>
+          <p className="text-sm text-[var(--color-ink-700)]">
+            <span className="text-[var(--color-ink-500)]">Type:</span> {org.vertical}
+          </p>
+          <p className="text-sm text-[var(--color-ink-700)]">
+            <span className="text-[var(--color-ink-500)]">Area:</span> {org.area}
+            {org.ward ? ` · ${org.ward}` : ""}
+          </p>
+          <p className="text-sm text-[var(--color-ink-700)]">
+            <span className="text-[var(--color-ink-500)]">Status:</span>{" "}
+            <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLE[org.approvalStatus]}`}>
+              {org.approvalStatus}
+            </span>
+          </p>
+          <p className="text-xs text-[var(--color-ink-300)] pt-2">
+            To change your shop name, photo, or area, contact admin support.
+          </p>
+        </div>
+      )}
+
+      {section === "payment" && (
+        <form
+          onSubmit={savePaymentNumbers}
+          className="bg-white rounded-[var(--radius-card)] shadow-card p-5 space-y-3 max-w-sm"
+        >
+          <p className="text-xs text-[var(--color-ink-500)]">
+            Buyers pay these numbers directly via the bKash/Nagad app, then
+            submit a transaction ID for you to confirm.
+          </p>
+          <div>
+            <label className={labelClass}>bKash number</label>
+            <input
+              placeholder="01XXXXXXXXX"
+              value={paymentNumbers.bkashNumber}
+              onChange={(e) => setPaymentNumbers({ ...paymentNumbers, bkashNumber: e.target.value })}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Nagad number</label>
+            <input
+              placeholder="01XXXXXXXXX"
+              value={paymentNumbers.nagadNumber}
+              onChange={(e) => setPaymentNumbers({ ...paymentNumbers, nagadNumber: e.target.value })}
+              className={inputClass}
+            />
+          </div>
+          {paymentSaved && (
+            <p className="text-xs text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] rounded-lg px-3 py-2">
+              Saved.
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={savingPayment}
+            className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-5 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] disabled:opacity-50"
+          >
+            {savingPayment ? "Saving..." : "Save"}
+          </button>
+        </form>
+      )}
+
+      {section === "images" && (
+        <div className="bg-white rounded-[var(--radius-card)] shadow-card p-5 space-y-3 max-w-sm">
+          <p className="text-xs text-[var(--color-ink-500)]">
+            Connect your own free Cloudinary account so your product photos
+            use your own storage, not a shared platform account. Get these
+            three values from{" "}
+            <a
+              href="https://console.cloudinary.com/settings/api-keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              console.cloudinary.com
+            </a>{" "}
+            after creating a free account.
+          </p>
+
+          {cloudinaryConnected ? (
+            <div className="flex items-center justify-between bg-[var(--color-emerald-50)] rounded-lg px-3 py-2.5">
+              <span className="text-sm text-[var(--color-emerald-700)] font-medium">
+                ✓ Connected
+              </span>
+              <button
+                onClick={disconnectCloudinary}
+                className="text-xs text-[var(--color-ink-500)] hover:text-red-600 flex-shrink-0 ml-2"
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={saveCloudinaryCredentials} className="space-y-3">
+              <div>
+                <label className={labelClass}>Cloud name</label>
+                <input
+                  required
+                  placeholder="e.g. my-shop-cloud"
+                  value={cloudinaryForm.cloudName}
+                  onChange={(e) => setCloudinaryForm({ ...cloudinaryForm, cloudName: e.target.value })}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>API key</label>
+                <input
+                  required
+                  placeholder="e.g. 123456789012345"
+                  value={cloudinaryForm.apiKey}
+                  onChange={(e) => setCloudinaryForm({ ...cloudinaryForm, apiKey: e.target.value })}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>API secret</label>
+                <input
+                  required
+                  type="password"
+                  placeholder="Kept encrypted, never shown again"
+                  value={cloudinaryForm.apiSecret}
+                  onChange={(e) => setCloudinaryForm({ ...cloudinaryForm, apiSecret: e.target.value })}
+                  className={inputClass}
+                />
+              </div>
+              {cloudinaryError && (
+                <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{cloudinaryError}</p>
+              )}
+              <p className="text-xs text-[var(--color-ink-300)]">
+                If you skip this, your photos still upload fine using
+                Muktagacha's shared account.
+              </p>
+              <button
+                type="submit"
+                disabled={savingCloudinary}
+                className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-5 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] disabled:opacity-50"
+              >
+                {savingCloudinary ? "Connecting..." : "Connect Cloudinary"}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
     </div>
   );
 }
