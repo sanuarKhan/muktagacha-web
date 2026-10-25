@@ -7,7 +7,7 @@ export type OrderStatus =
   | "OUT_FOR_DELIVERY"
   | "COMPLETED"
   | "CANCELLED";
-export type PaymentMethod = "CASH_ON_DELIVERY" | "BKASH" | "NAGAD";
+export type PaymentMethod = "CASH_ON_DELIVERY" | "BKASH" | "NAGAD" | "SKODEPAY";
 export type PaymentVerificationStatus =
   | "NOT_SUBMITTED"
   | "PENDING_VERIFICATION"
@@ -38,6 +38,7 @@ export interface Organization {
   bkashNumber?: string | null;
   nagadNumber?: string | null;
   cloudinaryCloudName?: string | null;
+  skodePayEnabled?: boolean;
 }
 
 export interface Category {

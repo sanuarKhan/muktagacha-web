@@ -1051,7 +1051,7 @@ function OrdersTab({
   );
 }
 
-type SettingsSection = "profile" | "payment" | "images";
+type SettingsSection = "profile" | "payment" | "images" | "skodepay";
 
 function MarketingTab({ org, token }: { org: Organization; token: string }) {
   const [contacts, setContacts] = useState<MarketingContact[]>([]);
@@ -1362,6 +1362,13 @@ function SettingsTab({ org, token }: { org: Organization; token: string }) {
   );
   const [cloudinaryError, setCloudinaryError] = useState<string | null>(null);
 
+  const [skodePayKey, setSkodePayKey] = useState("");
+  const [skodePayConnected, setSkodePayConnected] = useState(
+    !!org.skodePayEnabled,
+  );
+  const [savingSkodePay, setSavingSkodePay] = useState(false);
+  const [skodePayError, setSkodePayError] = useState<string | null>(null);
+
   async function savePaymentNumbers(e: React.FormEvent) {
     e.preventDefault();
     setSavingPayment(true);
@@ -1396,10 +1403,37 @@ function SettingsTab({ org, token }: { org: Organization; token: string }) {
     setCloudinaryConnected(false);
   }
 
+  async function saveSkodePay(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingSkodePay(true);
+    setSkodePayError(null);
+    try {
+      await api.patch(
+        `/organizations/${org.id}/skodepay-settings`,
+        { apiKey: skodePayKey, enabled: true },
+        token,
+      );
+      setSkodePayConnected(true);
+      setSkodePayKey("");
+    } catch (err: any) {
+      setSkodePayError(
+        err?.message ?? "Could not save that API key. Double-check it and try again.",
+      );
+    } finally {
+      setSavingSkodePay(false);
+    }
+  }
+
+  async function disconnectSkodePay() {
+    await api.patch(`/organizations/${org.id}/skodepay-settings`, { enabled: false }, token);
+    setSkodePayConnected(false);
+  }
+
   const SECTIONS: { id: SettingsSection; label: string }[] = [
     { id: "profile", label: "Shop profile" },
     { id: "payment", label: "Payment numbers" },
     { id: "images", label: "Image uploads" },
+    { id: "skodepay", label: "SkodePay" },
   ];
 
   return (
@@ -1565,6 +1599,71 @@ function SettingsTab({ org, token }: { org: Organization; token: string }) {
                 className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-5 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] disabled:opacity-50"
               >
                 {savingCloudinary ? "Connecting..." : "Connect Cloudinary"}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+
+      {section === "skodepay" && (
+        <div className="bg-white rounded-[var(--radius-card)] shadow-card p-5 space-y-3 max-w-sm">
+          <p className="text-xs text-[var(--color-ink-500)]">
+            Connect your own SkodePay account for a real hosted checkout page
+            with automatic payment verification — no more waiting for buyers
+            to manually submit a transaction ID. Get your API key from{" "}
+            <a
+              href="https://skodepay.skodedigital.tech"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              your SkodePay dashboard
+            </a>{" "}
+            under Settings → API Keys.
+          </p>
+          <p className="text-xs text-[var(--color-ink-300)]">
+            Money still goes straight to your own SkodePay account —
+            Muktagacha never holds or touches your funds.
+          </p>
+
+          {skodePayConnected ? (
+            <div className="flex items-center justify-between bg-[var(--color-emerald-50)] rounded-lg px-3 py-2.5">
+              <span className="text-sm text-[var(--color-emerald-700)] font-medium">
+                ✓ Connected
+              </span>
+              <button
+                onClick={disconnectSkodePay}
+                className="text-xs text-[var(--color-ink-500)] hover:text-red-600 flex-shrink-0 ml-2"
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={saveSkodePay} className="space-y-3">
+              <div>
+                <label className={labelClass}>SkodePay API key</label>
+                <input
+                  required
+                  type="password"
+                  placeholder="sk_..."
+                  value={skodePayKey}
+                  onChange={(e) => setSkodePayKey(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              {skodePayError && (
+                <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{skodePayError}</p>
+              )}
+              <p className="text-xs text-[var(--color-ink-300)]">
+                If you skip this, buyers can still pay you directly via
+                bKash/Nagad and submit a transaction ID.
+              </p>
+              <button
+                type="submit"
+                disabled={savingSkodePay}
+                className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-5 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] disabled:opacity-50"
+              >
+                {savingSkodePay ? "Connecting..." : "Connect SkodePay"}
               </button>
             </form>
           )}

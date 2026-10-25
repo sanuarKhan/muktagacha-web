@@ -26,6 +26,9 @@ export default function CheckoutPage() {
       Number(l.variant?.priceOverride ?? l.product.basePrice) * l.quantity,
     0,
   );
+  const allVendorsHaveSkodePay =
+    Object.keys(vendorOrgs).length > 0 &&
+    Object.keys(grouped).every((orgId) => vendorOrgs[orgId]?.skodePayEnabled);
 
   // Fetch each vendor's org (for bKash/Nagad numbers to show at checkout)
   useEffect(() => {
@@ -43,7 +46,7 @@ export default function CheckoutPage() {
       router.push("/login");
       return;
     }
-    if (paymentMethod !== "CASH_ON_DELIVERY") {
+    if (paymentMethod === "BKASH" || paymentMethod === "NAGAD") {
       const missing = Object.keys(grouped).filter((orgId) => !trxIds[orgId]?.trim());
       if (missing.length > 0) {
         setError(
@@ -57,6 +60,7 @@ export default function CheckoutPage() {
     try {
       // One order per vendor — each vendor fulfills their own sub-order
       // independently, matching the multi-vendor cart design from the plan.
+      let firstSkodePayUrl: string | null = null;
       for (const [organizationId, groupLines] of Object.entries(grouped)) {
         const order = await api.post<Order>(
           "/orders",
@@ -71,16 +75,29 @@ export default function CheckoutPage() {
           },
           token,
         );
-        if (paymentMethod !== "CASH_ON_DELIVERY" && trxIds[organizationId]) {
+        if ((paymentMethod === "BKASH" || paymentMethod === "NAGAD") && trxIds[organizationId]) {
           await api.post(
             `/orders/${order.id}/payment-proof`,
             { trxId: trxIds[organizationId] },
             token,
           );
         }
+        if (paymentMethod === "SKODEPAY" && !firstSkodePayUrl) {
+          const checkout = await api.post<{ checkoutUrl: string }>(
+            `/orders/${order.id}/skodepay-checkout`,
+            {},
+            token,
+          );
+          firstSkodePayUrl = checkout.checkoutUrl;
+        }
       }
       clear();
-      router.push("/orders");
+      if (firstSkodePayUrl) {
+        // Redirect to SkodePay's hosted checkout page to actually pay.
+        window.location.href = firstSkodePayUrl;
+      } else {
+        router.push("/orders");
+      }
     } catch (err: any) {
       setError(err?.message ?? "Could not place order. Please try again.");
     } finally {
@@ -126,7 +143,7 @@ export default function CheckoutPage() {
             </div>
           ))}
 
-          {paymentMethod !== "CASH_ON_DELIVERY" && (
+          {(paymentMethod === "BKASH" || paymentMethod === "NAGAD") && (
             <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
               {(() => {
                 const org = vendorOrgs[orgId];
@@ -188,12 +205,21 @@ export default function CheckoutPage() {
           <option value="CASH_ON_DELIVERY">Cash on Delivery</option>
           <option value="BKASH">bKash (pay vendor directly)</option>
           <option value="NAGAD">Nagad (pay vendor directly)</option>
+          {allVendorsHaveSkodePay && (
+            <option value="SKODEPAY">SkodePay (secure online payment)</option>
+          )}
         </select>
-        {paymentMethod !== "CASH_ON_DELIVERY" && (
+        {(paymentMethod === "BKASH" || paymentMethod === "NAGAD") && (
           <p className="text-xs text-[var(--color-ink-500)] mt-2">
             Muktagacha doesn't process payments itself — you pay the vendor's
             own bKash/Nagad number directly, and they confirm your transaction
             ID before preparing your order.
+          </p>
+        )}
+        {paymentMethod === "SKODEPAY" && (
+          <p className="text-xs text-[var(--color-ink-500)] mt-2">
+            You'll be taken to a secure SkodePay payment page to complete
+            your payment — no need to manually type a transaction ID.
           </p>
         )}
       </div>
