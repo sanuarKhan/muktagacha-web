@@ -161,6 +161,7 @@ const PAYMENT_VERIFICATION_STYLE: Record<string, string> = {
 };
 
 type VariantDraft = {
+  id?: string;
   size: string;
   color: string;
   stockCount: string;
@@ -439,82 +440,34 @@ function ProductsTab({
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
   categories: Category[];
 }) {
-  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
-  const [hasVariants, setHasVariants] = useState(false);
-  const [variants, setVariants] = useState<VariantDraft[]>([
-    { size: "", color: "", stockCount: "", priceOverride: "" },
-  ]);
-  const [productForm, setProductForm] = useState({
-    name: "",
-    description: "",
-    basePrice: "",
-    categoryId: "",
-    imageUrl: "" as string | null,
-  });
-  const [saving, setSaving] = useState(false);
 
-  async function getUploadSignature(): Promise<CloudinaryUploadSignature> {
-    return api.get<CloudinaryUploadSignature>(
-      `/organizations/${org.id}/cloudinary/upload-signature`,
-      token,
-    );
+  function openAdd() {
+    setEditingProduct(null);
+    setShowForm(true);
   }
-
-  function addVariantRow() {
-    setVariants((prev) => [...prev, { size: "", color: "", stockCount: "", priceOverride: "" }]);
+  function openEdit(p: Product) {
+    setEditingProduct(p);
+    setShowForm(true);
   }
-  function removeVariantRow(index: number) {
-    setVariants((prev) => prev.filter((_, i) => i !== index));
-  }
-  function updateVariant(index: number, field: keyof VariantDraft, value: string) {
-    setVariants((prev) => prev.map((v, i) => (i === index ? { ...v, [field]: value } : v)));
-  }
-
-  async function addProduct(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      const builtVariants = hasVariants
-        ? variants
-            .filter((v) => v.size || v.color)
-            .map((v) => ({
-              optionValues: {
-                ...(v.size ? { size: v.size } : {}),
-                ...(v.color ? { color: v.color } : {}),
-              },
-              stockCount: Number(v.stockCount) || 0,
-              priceOverride: v.priceOverride ? Number(v.priceOverride) : undefined,
-            }))
-        : [];
-
-      const product = await api.post<Product>(
-        "/products",
-        {
-          organizationId: org.id,
-          categoryId: productForm.categoryId || undefined,
-          name: productForm.name,
-          description: productForm.description || undefined,
-          basePrice: Number(productForm.basePrice),
-          hasVariants,
-          images: productForm.imageUrl ? [{ url: productForm.imageUrl }] : undefined,
-          variants: builtVariants.length ? builtVariants : undefined,
-        },
-        token,
-      );
-      setProducts((prev) => [...prev, product]);
-      setProductForm({ name: "", description: "", basePrice: "", categoryId: "", imageUrl: "" });
-      setHasVariants(false);
-      setVariants([{ size: "", color: "", stockCount: "", priceOverride: "" }]);
-      setShowAddProduct(false);
-    } finally {
-      setSaving(false);
-    }
+  function closeForm() {
+    setShowForm(false);
+    setEditingProduct(null);
   }
 
   async function removeProduct(id: string) {
     await api.delete(`/products/${id}`, token);
     setProducts((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  function handleSaved(product: Product) {
+    setProducts((prev) => {
+      const exists = prev.some((p) => p.id === product.id);
+      return exists ? prev.map((p) => (p.id === product.id ? product : p)) : [...prev, product];
+    });
+    closeForm();
   }
 
   const filtered = search
@@ -527,9 +480,9 @@ function ProductsTab({
         <h2 className="font-display text-lg font-semibold text-[var(--color-ink-900)]">
           Products ({products.length})
         </h2>
-        {!showAddProduct && (
+        {!showForm && (
           <button
-            onClick={() => setShowAddProduct(true)}
+            onClick={openAdd}
             className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors"
           >
             + Add product
@@ -537,140 +490,15 @@ function ProductsTab({
         )}
       </div>
 
-      {showAddProduct && (
-        <form
-          onSubmit={addProduct}
-          className="bg-white rounded-[var(--radius-card)] shadow-card p-5 space-y-3 max-w-sm mb-6"
-        >
-          <ImageUploadField
-            value={productForm.imageUrl}
-            onChange={(url) => setProductForm({ ...productForm, imageUrl: url })}
-            label="Product photo"
-            getUploadSignature={getUploadSignature}
-          />
-          <input
-            required
-            placeholder="Product name"
-            value={productForm.name}
-            onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-            className={inputClass}
-          />
-          <textarea
-            placeholder="Short description (optional)"
-            value={productForm.description}
-            onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-            rows={2}
-            className={inputClass}
-          />
-          <div>
-            <label className={labelClass}>Category</label>
-            <select
-              value={productForm.categoryId}
-              onChange={(e) => setProductForm({ ...productForm, categoryId: e.target.value })}
-              className={inputClass}
-            >
-              <option value="">Select a category</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            {categories.length === 0 && (
-              <p className="text-xs text-[var(--color-ink-300)] mt-1">
-                No categories set up yet for this shop type — ask the admin
-                to add one, or leave blank for now.
-              </p>
-            )}
-          </div>
-          <input
-            required
-            type="number"
-            placeholder={hasVariants ? "Starting price (৳)" : "Price (৳)"}
-            value={productForm.basePrice}
-            onChange={(e) => setProductForm({ ...productForm, basePrice: e.target.value })}
-            className={inputClass}
-          />
-
-          <label className="flex items-center gap-2 text-sm text-[var(--color-ink-700)]">
-            <input
-              type="checkbox"
-              checked={hasVariants}
-              onChange={(e) => setHasVariants(e.target.checked)}
-            />
-            This product comes in different sizes/colors
-          </label>
-
-          {hasVariants && (
-            <div className="space-y-2 bg-[var(--color-cream-100)] rounded-[12px] p-3">
-              <p className="text-xs text-[var(--color-ink-500)]">
-                Add each size/color combination you stock, with its own
-                quantity. Leave price blank to use the base price above.
-              </p>
-              {variants.map((v, i) => (
-                <div key={i} className="flex gap-1.5 items-center">
-                  <input
-                    placeholder="Size"
-                    value={v.size}
-                    onChange={(e) => updateVariant(i, "size", e.target.value)}
-                    className="w-16 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
-                  />
-                  <input
-                    placeholder="Color"
-                    value={v.color}
-                    onChange={(e) => updateVariant(i, "color", e.target.value)}
-                    className="w-20 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Qty"
-                    value={v.stockCount}
-                    onChange={(e) => updateVariant(i, "stockCount", e.target.value)}
-                    className="w-16 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
-                  />
-                  <input
-                    type="number"
-                    placeholder="৳ (opt.)"
-                    value={v.priceOverride}
-                    onChange={(e) => updateVariant(i, "priceOverride", e.target.value)}
-                    className="w-20 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeVariantRow(i)}
-                    className="text-[var(--color-ink-300)] hover:text-red-600 text-sm px-1"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={addVariantRow}
-                className="text-xs text-[var(--color-emerald-700)] font-medium"
-              >
-                + Add another combination
-              </button>
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-5 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] disabled:opacity-50"
-            >
-              {saving ? "Saving..." : "Save product"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowAddProduct(false)}
-              className="text-sm text-[var(--color-ink-500)] px-3"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+      {showForm && (
+        <ProductForm
+          org={org}
+          token={token}
+          categories={categories}
+          product={editingProduct}
+          onSaved={handleSaved}
+          onCancel={closeForm}
+        />
       )}
 
       {products.length > 0 && (
@@ -696,22 +524,37 @@ function ProductsTab({
                   No photo
                 </div>
               )}
+              {(p.images?.length ?? 0) > 1 && (
+                <span className="absolute bottom-1.5 right-1.5 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                  +{(p.images?.length ?? 1) - 1} more
+                </span>
+              )}
             </div>
             <div className="p-2.5">
               <p className="text-sm font-medium text-[var(--color-ink-900)] truncate">{p.name}</p>
               {p.hasVariants && (
-                <p className="text-xs text-[var(--color-ink-500)]">{p.variants.length} variant(s)</p>
+                <p className="text-xs text-[var(--color-ink-500)]">
+                  {p.variants.filter((v) => v.isActive).length} variant(s)
+                </p>
               )}
               <div className="flex items-center justify-between mt-1">
                 <span className="text-sm font-semibold text-[var(--color-emerald-700)]">
                   ৳{p.basePrice}
                 </span>
-                <button
-                  onClick={() => removeProduct(p.id)}
-                  className="text-xs text-[var(--color-ink-300)] hover:text-red-600"
-                >
-                  Remove
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => openEdit(p)}
+                    className="text-xs text-[var(--color-emerald-700)] hover:underline font-medium"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => removeProduct(p.id)}
+                    className="text-xs text-[var(--color-ink-300)] hover:text-red-600"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -723,6 +566,270 @@ function ProductsTab({
         )}
       </div>
     </div>
+  );
+}
+
+// Shared Add/Edit form. When `product` is null, this creates a new
+// product (POST); when it's set, this edits in place (PATCH) and
+// pre-fills every field including existing photos and variants, so a
+// vendor actually sees what they're changing instead of starting blank.
+function ProductForm({
+  org,
+  token,
+  categories,
+  product,
+  onSaved,
+  onCancel,
+}: {
+  org: Organization;
+  token: string;
+  categories: Category[];
+  product: Product | null;
+  onSaved: (p: Product) => void;
+  onCancel: () => void;
+}) {
+  const isEdit = !!product;
+  const [hasVariants, setHasVariants] = useState(product?.hasVariants ?? false);
+  const [images, setImages] = useState<string[]>(
+    product?.images?.map((img) => img.url) ?? [],
+  );
+  const [variants, setVariants] = useState<VariantDraft[]>(
+    product?.variants
+      ?.filter((v) => v.isActive)
+      .map((v) => ({
+        id: v.id,
+        size: v.optionValues?.size ?? "",
+        color: v.optionValues?.color ?? "",
+        stockCount: String(v.stockCount ?? ""),
+        priceOverride: v.priceOverride ? String(v.priceOverride) : "",
+      })) ?? [{ size: "", color: "", stockCount: "", priceOverride: "" }],
+  );
+  const [form, setForm] = useState({
+    name: product?.name ?? "",
+    description: product?.description ?? "",
+    basePrice: product?.basePrice ? String(product.basePrice) : "",
+    categoryId: product?.categoryId ?? "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  async function getUploadSignature(): Promise<CloudinaryUploadSignature> {
+    return api.get<CloudinaryUploadSignature>(
+      `/organizations/${org.id}/cloudinary/upload-signature`,
+      token,
+    );
+  }
+
+  function addImageSlot() {
+    setImages((prev) => [...prev, ""]);
+  }
+  function setImageAt(index: number, url: string | null) {
+    setImages((prev) => prev.map((u, i) => (i === index ? url ?? "" : u)));
+  }
+  function removeImageAt(index: number) {
+    setImages((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function addVariantRow() {
+    setVariants((prev) => [...prev, { size: "", color: "", stockCount: "", priceOverride: "" }]);
+  }
+  function removeVariantRow(index: number) {
+    setVariants((prev) => prev.filter((_, i) => i !== index));
+  }
+  function updateVariant(index: number, field: keyof VariantDraft, value: string) {
+    setVariants((prev) => prev.map((v, i) => (i === index ? { ...v, [field]: value } : v)));
+  }
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const builtVariants = hasVariants
+        ? variants
+            .filter((v) => v.size || v.color)
+            .map((v) => ({
+              id: v.id,
+              optionValues: {
+                ...(v.size ? { size: v.size } : {}),
+                ...(v.color ? { color: v.color } : {}),
+              },
+              stockCount: Number(v.stockCount) || 0,
+              priceOverride: v.priceOverride ? Number(v.priceOverride) : undefined,
+            }))
+        : [];
+      const cleanImages = images.filter((u) => u).map((url) => ({ url }));
+
+      const payload = {
+        organizationId: org.id,
+        categoryId: form.categoryId || undefined,
+        name: form.name,
+        description: form.description || undefined,
+        basePrice: Number(form.basePrice),
+        hasVariants,
+        images: cleanImages,
+        variants: builtVariants,
+      };
+
+      const saved = isEdit
+        ? await api.patch<Product>(`/products/${product!.id}`, payload, token)
+        : await api.post<Product>("/products", payload, token);
+      onSaved(saved);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={save}
+      className="bg-white rounded-[var(--radius-card)] shadow-card p-5 space-y-3 max-w-sm mb-6"
+    >
+      <h3 className="font-display font-semibold text-[var(--color-ink-900)]">
+        {isEdit ? "Edit product" : "Add product"}
+      </h3>
+
+      <div>
+        <label className={labelClass}>Photos (first one is the main photo)</label>
+        <div className="flex flex-wrap gap-2">
+          {images.map((url, i) => (
+            <ImageUploadField
+              key={i}
+              value={url || null}
+              onChange={(u) => setImageAt(i, u)}
+              label=""
+              size="sm"
+              getUploadSignature={getUploadSignature}
+              onRemove={() => removeImageAt(i)}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={addImageSlot}
+            className="w-20 h-20 rounded-[12px] border-2 border-dashed border-[var(--color-border)] flex items-center justify-center text-[var(--color-ink-300)] text-2xl hover:border-[var(--color-emerald-600)] hover:text-[var(--color-emerald-600)] transition-colors"
+          >
+            +
+          </button>
+        </div>
+      </div>
+
+      <input
+        required
+        placeholder="Product name"
+        value={form.name}
+        onChange={(e) => setForm({ ...form, name: e.target.value })}
+        className={inputClass}
+      />
+      <textarea
+        placeholder="Short description (optional)"
+        value={form.description}
+        onChange={(e) => setForm({ ...form, description: e.target.value })}
+        rows={2}
+        className={inputClass}
+      />
+      <div>
+        <label className={labelClass}>Category</label>
+        <select
+          value={form.categoryId}
+          onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+          className={inputClass}
+        >
+          <option value="">Select a category</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        {categories.length === 0 && (
+          <p className="text-xs text-[var(--color-ink-300)] mt-1">
+            No categories set up yet for this shop type — ask the admin
+            to add one, or leave blank for now.
+          </p>
+        )}
+      </div>
+      <input
+        required
+        type="number"
+        placeholder={hasVariants ? "Starting price (৳)" : "Price (৳)"}
+        value={form.basePrice}
+        onChange={(e) => setForm({ ...form, basePrice: e.target.value })}
+        className={inputClass}
+      />
+
+      <label className="flex items-center gap-2 text-sm text-[var(--color-ink-700)]">
+        <input
+          type="checkbox"
+          checked={hasVariants}
+          onChange={(e) => setHasVariants(e.target.checked)}
+        />
+        This product comes in different sizes/colors
+      </label>
+
+      {hasVariants && (
+        <div className="space-y-2 bg-[var(--color-cream-100)] rounded-[12px] p-3">
+          <p className="text-xs text-[var(--color-ink-500)]">
+            Add each size/color combination you stock, with its own
+            quantity. Leave price blank to use the base price above.
+          </p>
+          {variants.map((v, i) => (
+            <div key={i} className="flex gap-1.5 items-center">
+              <input
+                placeholder="Size"
+                value={v.size}
+                onChange={(e) => updateVariant(i, "size", e.target.value)}
+                className="w-16 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
+              />
+              <input
+                placeholder="Color"
+                value={v.color}
+                onChange={(e) => updateVariant(i, "color", e.target.value)}
+                className="w-20 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
+              />
+              <input
+                type="number"
+                placeholder="Qty"
+                value={v.stockCount}
+                onChange={(e) => updateVariant(i, "stockCount", e.target.value)}
+                className="w-16 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
+              />
+              <input
+                type="number"
+                placeholder="৳ (opt.)"
+                value={v.priceOverride}
+                onChange={(e) => updateVariant(i, "priceOverride", e.target.value)}
+                className="w-20 border border-[var(--color-border)] rounded-[8px] px-2 py-1.5 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => removeVariantRow(i)}
+                className="text-[var(--color-ink-300)] hover:text-red-600 text-sm px-1"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addVariantRow}
+            className="text-xs text-[var(--color-emerald-700)] font-medium"
+          >
+            + Add another combination
+          </button>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={saving}
+          className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-5 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] disabled:opacity-50"
+        >
+          {saving ? "Saving..." : isEdit ? "Save changes" : "Save product"}
+        </button>
+        <button type="button" onClick={onCancel} className="text-sm text-[var(--color-ink-500)] px-3">
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 
