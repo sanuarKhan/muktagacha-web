@@ -13,6 +13,8 @@ import type {
   Vertical,
   Category,
   CloudinaryUploadSignature,
+  MarketingContact,
+  MarketingCampaign,
 } from "@/lib/types";
 
 const inputClass =
@@ -164,12 +166,13 @@ type VariantDraft = {
   priceOverride: string;
 };
 
-type Tab = "home" | "products" | "orders" | "settings";
+type Tab = "home" | "products" | "orders" | "marketing" | "settings";
 
 const NAV_ITEMS: { id: Tab; label: string; icon: string }[] = [
   { id: "home", label: "Home", icon: "●" },
   { id: "products", label: "Products", icon: "▦" },
   { id: "orders", label: "Orders", icon: "▤" },
+  { id: "marketing", label: "Marketing", icon: "◆" },
   { id: "settings", label: "Settings", icon: "⚙" },
 ];
 
@@ -293,6 +296,8 @@ function VendorDashboard({ org, token }: { org: Organization; token: string }) {
             />
           ) : tab === "orders" ? (
             <OrdersTab org={org} token={token} orders={orders} setOrders={setOrders} />
+          ) : tab === "marketing" ? (
+            <MarketingTab org={org} token={token} />
           ) : (
             <SettingsTab org={org} token={token} />
           )}
@@ -397,13 +402,13 @@ function HomeTab({
         </div>
       )}
 
-      {/* Marketing placeholder — architecture slot for the planned SMS
-          campaign feature. Intentionally not built yet; this is a visible
-          reminder of where it will live once an SMS gateway is wired up. */}
       <h3 className="font-display font-semibold text-[var(--color-ink-900)] mt-8 mb-3">
         Marketing
       </h3>
-      <div className="bg-white rounded-[var(--radius-card)] shadow-card p-4 flex items-center justify-between">
+      <button
+        onClick={() => onGoTo("marketing")}
+        className="w-full bg-white rounded-[var(--radius-card)] shadow-card p-4 flex items-center justify-between hover:shadow-md transition-shadow text-left"
+      >
         <div>
           <p className="text-sm font-medium text-[var(--color-ink-900)]">
             SMS campaigns
@@ -412,10 +417,10 @@ function HomeTab({
             Upload your customers' numbers and send them a promotional SMS.
           </p>
         </div>
-        <span className="text-xs bg-[var(--color-cream-100)] text-[var(--color-ink-500)] px-2.5 py-1 rounded-full font-medium">
-          Coming soon
+        <span className="text-xs text-[var(--color-emerald-700)] font-medium">
+          Open →
         </span>
-      </div>
+      </button>
     </div>
   );
 }
@@ -850,6 +855,221 @@ function OrdersTab({
 }
 
 type SettingsSection = "profile" | "payment" | "images";
+
+function MarketingTab({ org, token }: { org: Organization; token: string }) {
+  const [contacts, setContacts] = useState<MarketingContact[]>([]);
+  const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [bulkText, setBulkText] = useState("");
+  const [addingContacts, setAddingContacts] = useState(false);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<MarketingCampaign | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      api.get<MarketingContact[]>(`/organizations/${org.id}/marketing/contacts`, token),
+      api.get<MarketingCampaign[]>(`/organizations/${org.id}/marketing/campaigns`, token),
+    ])
+      .then(([c, camp]) => {
+        setContacts(c);
+        setCampaigns(camp);
+      })
+      .finally(() => setLoading(false));
+  }, [org.id, token]);
+
+  // Parses lines like "01712345678" or "01712345678, Rahim" - one contact
+  // per line, name optional after a comma. Simple and forgiving since
+  // vendors will paste this from their phone's contact export or WhatsApp.
+  async function addBulkContacts(e: React.FormEvent) {
+    e.preventDefault();
+    const lines = bulkText
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const parsed = lines.map((line) => {
+      const [phone, ...rest] = line.split(",");
+      return { phone: phone.trim(), name: rest.join(",").trim() || undefined };
+    });
+    if (parsed.length === 0) return;
+    setAddingContacts(true);
+    try {
+      await api.post(`/organizations/${org.id}/marketing/contacts`, { contacts: parsed }, token);
+      const refreshed = await api.get<MarketingContact[]>(
+        `/organizations/${org.id}/marketing/contacts`,
+        token,
+      );
+      setContacts(refreshed);
+      setBulkText("");
+    } finally {
+      setAddingContacts(false);
+    }
+  }
+
+  async function removeContact(id: string) {
+    await api.delete(`/organizations/${org.id}/marketing/contacts/${id}`, token);
+    setContacts((prev) => prev.filter((c) => c.id !== id));
+  }
+
+  async function sendCampaign(e: React.FormEvent) {
+    e.preventDefault();
+    if (!message.trim() || contacts.length === 0) return;
+    setSending(true);
+    setSendResult(null);
+    try {
+      const campaign = await api.post<MarketingCampaign>(
+        `/organizations/${org.id}/marketing/campaigns`,
+        { message },
+        token,
+      );
+      setCampaigns((prev) => [campaign, ...prev]);
+      setSendResult(campaign);
+      setMessage("");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  if (loading) {
+    return <p className="text-sm text-[var(--color-ink-500)]">Loading...</p>;
+  }
+
+  return (
+    <div>
+      <h2 className="font-display text-lg font-semibold text-[var(--color-ink-900)] mb-1">
+        Marketing
+      </h2>
+      <p className="text-sm text-[var(--color-ink-500)] mb-6">
+        Upload your customers' phone numbers and send them a promotional SMS
+        whenever you want — new stock, a sale, anything.
+      </p>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Contacts */}
+        <div>
+          <h3 className="font-display font-semibold text-[var(--color-ink-900)] mb-3">
+            Customers ({contacts.length})
+          </h3>
+          <form
+            onSubmit={addBulkContacts}
+            className="bg-white rounded-[var(--radius-card)] shadow-card p-4 space-y-2 mb-4"
+          >
+            <label className={labelClass}>Add numbers (one per line)</label>
+            <textarea
+              placeholder={"01712345678, Rahim\n01898765432\n..."}
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              rows={4}
+              className={inputClass}
+            />
+            <p className="text-xs text-[var(--color-ink-300)]">
+              Name is optional — just add a comma after the number if you have one.
+            </p>
+            <button
+              type="submit"
+              disabled={addingContacts || !bulkText.trim()}
+              className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] disabled:opacity-50"
+            >
+              {addingContacts ? "Adding..." : "Add to list"}
+            </button>
+          </form>
+
+          <div className="bg-white rounded-[var(--radius-card)] shadow-card divide-y divide-[var(--color-border)] max-h-72 overflow-y-auto">
+            {contacts.length === 0 && (
+              <p className="text-sm text-[var(--color-ink-500)] p-4">
+                No customers added yet.
+              </p>
+            )}
+            {contacts.map((c) => (
+              <div key={c.id} className="p-3 flex items-center justify-between text-sm">
+                <div>
+                  <p className="font-medium text-[var(--color-ink-900)]">{c.phone}</p>
+                  {c.name && <p className="text-xs text-[var(--color-ink-500)]">{c.name}</p>}
+                </div>
+                <button
+                  onClick={() => removeContact(c.id)}
+                  className="text-xs text-[var(--color-ink-300)] hover:text-red-600"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Send a campaign */}
+        <div>
+          <h3 className="font-display font-semibold text-[var(--color-ink-900)] mb-3">
+            Send a message
+          </h3>
+          <form
+            onSubmit={sendCampaign}
+            className="bg-white rounded-[var(--radius-card)] shadow-card p-4 space-y-3"
+          >
+            <textarea
+              required
+              placeholder="e.g. Eid special! 20% off all items this week at our shop."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={4}
+              className={inputClass}
+            />
+            <p className="text-xs text-[var(--color-ink-500)]">
+              This will be sent to all {contacts.length} customer
+              {contacts.length === 1 ? "" : "s"} on your list.
+            </p>
+            {contacts.length === 0 && (
+              <p className="text-xs text-[var(--color-gold-600)] bg-[var(--color-gold-50)] rounded-lg px-3 py-2">
+                Add some customer numbers on the left before sending.
+              </p>
+            )}
+            <button
+              type="submit"
+              disabled={sending || contacts.length === 0}
+              className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] disabled:opacity-50"
+            >
+              {sending ? "Sending..." : `Send to ${contacts.length} customer(s)`}
+            </button>
+            {sendResult && (
+              <p
+                className={`text-xs rounded-lg px-3 py-2 ${
+                  sendResult.sentCount > 0
+                    ? "bg-[var(--color-emerald-50)] text-[var(--color-emerald-700)]"
+                    : "bg-red-50 text-red-700"
+                }`}
+              >
+                {sendResult.sentCount > 0
+                  ? `Sent to ${sendResult.sentCount} of ${sendResult.recipientCount} customers.`
+                  : "Couldn't send — SMS isn't set up on this account yet. Contact support."}
+              </p>
+            )}
+          </form>
+
+          <h3 className="font-display font-semibold text-[var(--color-ink-900)] mt-6 mb-3">
+            Past campaigns
+          </h3>
+          <div className="bg-white rounded-[var(--radius-card)] shadow-card divide-y divide-[var(--color-border)]">
+            {campaigns.length === 0 && (
+              <p className="text-sm text-[var(--color-ink-500)] p-4">
+                No campaigns sent yet.
+              </p>
+            )}
+            {campaigns.map((c) => (
+              <div key={c.id} className="p-3 text-sm">
+                <p className="text-[var(--color-ink-900)] line-clamp-2">{c.message}</p>
+                <p className="text-xs text-[var(--color-ink-500)] mt-1">
+                  {new Date(c.createdAt).toLocaleDateString()} · Sent {c.sentCount}/
+                  {c.recipientCount}
+                  {c.failedCount > 0 && ` · ${c.failedCount} failed`}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SettingsTab({ org, token }: { org: Organization; token: string }) {
   const [section, setSection] = useState<SettingsSection>("profile");

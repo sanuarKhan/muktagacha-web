@@ -122,3 +122,25 @@ export interface CloudinaryUploadSignature {
   signature: string;
   folder: string;
 }
+
+export interface MarketingContact {
+  id: string;
+  organizationId: string;
+  phone: string;
+  name?: string | null;
+  createdAt: string;
+}
+
+export type CampaignStatus = "DRAFT" | "SENDING" | "SENT" | "FAILED";
+
+export interface MarketingCampaign {
+  id: string;
+  organizationId: string;
+  message: string;
+  status: CampaignStatus;
+  recipientCount: number;
+  sentCount: number;
+  failedCount: number;
+  createdAt: string;
+  sentAt?: string | null;
+}
