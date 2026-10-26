@@ -111,6 +111,8 @@ export interface Order {
   rider?: { fullName: string; phone: string } | null;
   deliveryNote?: string | null;
   deliveredAt?: string | null;
+  deliveryLatitude?: string | null;
+  deliveryLongitude?: string | null;
   createdAt: string;
   items: OrderItem[];
   organization?: Organization;

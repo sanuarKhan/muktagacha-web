@@ -1,11 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import type { Order, PaymentMethod, Organization } from "@/lib/types";
+
+const LocationPicker = dynamic(() => import("@/components/LocationPicker"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[220px] rounded-[14px] bg-[var(--color-cream-100)] flex items-center justify-center text-sm text-[var(--color-ink-300)]">
+      Loading map...
+    </div>
+  ),
+});
 
 export default function CheckoutPage() {
   const { lines, linesByOrganization, clear } = useCart();
@@ -18,6 +28,9 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [trxIds, setTrxIds] = useState<Record<string, string>>({});
   const [vendorOrgs, setVendorOrgs] = useState<Record<string, Organization>>({});
+  const [deliveryPin, setDeliveryPin] = useState<{ lat: number; lng: number } | null>(null);
+  const [showMap, setShowMap] = useState(false);
+  const [locating, setLocating] = useState(false);
 
   const grouped = linesByOrganization();
   const total = lines.reduce(
@@ -40,6 +53,28 @@ export default function CheckoutPage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function useMyLocation() {
+    if (!navigator.geolocation) {
+      setError("Your browser doesn't support location — please pin it on the map instead.");
+      setShowMap(true);
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setDeliveryPin({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setShowMap(true);
+        setLocating(false);
+      },
+      () => {
+        setError("Couldn't get your location — please pin it on the map instead.");
+        setShowMap(true);
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
 
   async function placeOrders() {
     if (!user || !token) {
@@ -67,6 +102,8 @@ export default function CheckoutPage() {
           {
             organizationId,
             paymentMethod,
+            deliveryLatitude: deliveryPin?.lat,
+            deliveryLongitude: deliveryPin?.lng,
             items: groupLines.map((l) => ({
               productId: l.product.id,
               variantId: l.variant?.id,
@@ -221,6 +258,50 @@ export default function CheckoutPage() {
             You'll be taken to a secure SkodePay payment page to complete
             your payment — no need to manually type a transaction ID.
           </p>
+        )}
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-[var(--color-ink-700)] mb-2">
+          Delivery location (optional)
+        </label>
+        <p className="text-xs text-[var(--color-ink-500)] mb-2">
+          Pin your exact location so the delivery rider can find you easily.
+          If you skip this, we'll use your area/ward address instead.
+        </p>
+        {!showMap && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={useMyLocation}
+              disabled={locating}
+              className="text-sm bg-white border border-[var(--color-border)] rounded-[var(--radius-pill)] px-4 py-2 hover:bg-[var(--color-emerald-50)] transition-colors disabled:opacity-50"
+            >
+              {locating ? "Finding you..." : "📍 Use my current location"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowMap(true)}
+              className="text-sm text-[var(--color-ink-500)] px-3 hover:text-[var(--color-ink-900)]"
+            >
+              Or pin on map
+            </button>
+          </div>
+        )}
+        {showMap && (
+          <div>
+            <LocationPicker
+              lat={deliveryPin?.lat}
+              lng={deliveryPin?.lng}
+              onChange={(lat, lng) => setDeliveryPin({ lat, lng })}
+              height={220}
+            />
+            {deliveryPin && (
+              <p className="text-xs text-[var(--color-ink-500)] mt-1.5">
+                Pinned at {deliveryPin.lat.toFixed(5)}, {deliveryPin.lng.toFixed(5)}
+              </p>
+            )}
+          </div>
         )}
       </div>
 

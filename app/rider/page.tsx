@@ -235,6 +235,16 @@ function RiderDashboard({ profile, token }: { profile: RiderProfile; token: stri
                 <p className="text-xs text-[var(--color-ink-500)] mt-1">
                   {o.items?.length ?? 0} item(s) · {o.paymentMethod.replace(/_/g, " ")}
                 </p>
+                {o.deliveryLatitude && o.deliveryLongitude && (
+                  <a
+                    href={`https://www.openstreetmap.org/directions?from=&to=${o.deliveryLatitude}%2C${o.deliveryLongitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-[var(--color-emerald-700)] font-medium hover:underline mt-1.5"
+                  >
+                    📍 Open delivery location on map
+                  </a>
+                )}
                 <div className="mt-3 flex gap-2">
                   <input
                     placeholder="Delivery note (optional)"
