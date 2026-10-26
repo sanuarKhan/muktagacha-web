@@ -1,11 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import ImageUploadField from "@/components/ImageUploadField";
+
+// Leaflet touches window/document, so it must be loaded client-side
+// only - dynamic() with ssr:false is the standard Next.js fix.
+const LocationPicker = dynamic(() => import("@/components/LocationPicker"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[280px] rounded-[14px] bg-[var(--color-cream-100)] flex items-center justify-center text-sm text-[var(--color-ink-300)]">
+      Loading map...
+    </div>
+  ),
+});
 import type {
   Product,
   Order,
@@ -1051,7 +1063,7 @@ function OrdersTab({
   );
 }
 
-type SettingsSection = "profile" | "payment" | "images" | "skodepay";
+type SettingsSection = "profile" | "payment" | "images" | "skodepay" | "location";
 
 function MarketingTab({ org, token }: { org: Organization; token: string }) {
   const [contacts, setContacts] = useState<MarketingContact[]>([]);
@@ -1369,6 +1381,14 @@ function SettingsTab({ org, token }: { org: Organization; token: string }) {
   const [savingSkodePay, setSavingSkodePay] = useState(false);
   const [skodePayError, setSkodePayError] = useState<string | null>(null);
 
+  const [pin, setPin] = useState<{ lat: number; lng: number } | null>(
+    org.latitude && org.longitude
+      ? { lat: Number(org.latitude), lng: Number(org.longitude) }
+      : null,
+  );
+  const [savingLocation, setSavingLocation] = useState(false);
+  const [locationSaved, setLocationSaved] = useState(false);
+
   async function savePaymentNumbers(e: React.FormEvent) {
     e.preventDefault();
     setSavingPayment(true);
@@ -1429,11 +1449,28 @@ function SettingsTab({ org, token }: { org: Organization; token: string }) {
     setSkodePayConnected(false);
   }
 
+  async function saveLocation() {
+    if (!pin) return;
+    setSavingLocation(true);
+    setLocationSaved(false);
+    try {
+      await api.patch(
+        `/organizations/${org.id}/location`,
+        { latitude: pin.lat, longitude: pin.lng },
+        token,
+      );
+      setLocationSaved(true);
+    } finally {
+      setSavingLocation(false);
+    }
+  }
+
   const SECTIONS: { id: SettingsSection; label: string }[] = [
     { id: "profile", label: "Shop profile" },
     { id: "payment", label: "Payment numbers" },
     { id: "images", label: "Image uploads" },
     { id: "skodepay", label: "SkodePay" },
+    { id: "location", label: "Location" },
   ];
 
   return (
@@ -1667,6 +1704,42 @@ function SettingsTab({ org, token }: { org: Organization; token: string }) {
               </button>
             </form>
           )}
+        </div>
+      )}
+
+      {section === "location" && (
+        <div className="bg-white rounded-[var(--radius-card)] shadow-card p-5 space-y-3 max-w-md">
+          <p className="text-xs text-[var(--color-ink-500)]">
+            Tap anywhere on the map to drop a pin at your shop's real
+            location. This appears on your storefront so buyers can see
+            exactly where you are — a free OpenStreetMap map, no Google
+            account needed.
+          </p>
+          <LocationPicker
+            lat={pin?.lat}
+            lng={pin?.lng}
+            onChange={(lat, lng) => {
+              setPin({ lat, lng });
+              setLocationSaved(false);
+            }}
+          />
+          {pin && (
+            <p className="text-xs text-[var(--color-ink-500)]">
+              Pinned at {pin.lat.toFixed(5)}, {pin.lng.toFixed(5)}
+            </p>
+          )}
+          {locationSaved && (
+            <p className="text-xs text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] rounded-lg px-3 py-2">
+              Saved.
+            </p>
+          )}
+          <button
+            onClick={saveLocation}
+            disabled={!pin || savingLocation}
+            className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-5 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] disabled:opacity-50"
+          >
+            {savingLocation ? "Saving..." : "Save location"}
+          </button>
         </div>
       )}
     </div>

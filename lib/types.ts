@@ -39,6 +39,8 @@ export interface Organization {
   nagadNumber?: string | null;
   cloudinaryCloudName?: string | null;
   skodePayEnabled?: boolean;
+  latitude?: string | null;
+  longitude?: string | null;
 }
 
 export interface Category {
