@@ -1,11 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useCart } from "@/lib/cart-context";
-import type { Product, Category, ProductVariant } from "@/lib/types";
+import type { Product, Category, ProductVariant, Organization } from "@/lib/types";
+
+const LocationDisplay = dynamic(() => import("@/components/LocationDisplay"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[200px] rounded-[14px] bg-[var(--color-cream-100)] flex items-center justify-center text-sm text-[var(--color-ink-300)]">
+      Loading map...
+    </div>
+  ),
+});
 
 const CATEGORY_HERO_IMAGES: Record<string, string> = {
   Groceries:
@@ -24,6 +34,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const { addItem, lines } = useCart();
   const [variantPicker, setVariantPicker] = useState<Product | null>(null);
+  const [shopModal, setShopModal] = useState<Organization | null>(null);
 
   useEffect(() => {
     api.get<Category[]>("/categories?vertical=MARKETPLACE").then(setCategories);
@@ -199,9 +210,12 @@ export default function HomePage() {
                 </div>
               )}
               <div className="p-5 flex flex-col flex-1">
-                <div className="text-xs text-[var(--color-ink-500)] mb-1.5">
+                <button
+                  onClick={() => product.organization && setShopModal(product.organization)}
+                  className="text-xs text-[var(--color-ink-500)] mb-1.5 hover:text-[var(--color-emerald-700)] hover:underline text-left"
+                >
                   {product.organization?.name ?? "Local vendor"}
-                </div>
+                </button>
                 <h3 className="font-display font-semibold text-lg text-[var(--color-ink-900)] mb-1">
                   {product.name}
                 </h3>
@@ -263,6 +277,61 @@ export default function HomePage() {
           }}
         />
       )}
+
+      {shopModal && (
+        <ShopInfoModal org={shopModal} onClose={() => setShopModal(null)} />
+      )}
+    </div>
+  );
+}
+
+function ShopInfoModal({ org, onClose }: { org: Organization; onClose: () => void }) {
+  const lat = org.latitude ? Number(org.latitude) : null;
+  const lng = org.longitude ? Number(org.longitude) : null;
+
+  return (
+    <div
+      className="fixed inset-0 bg-[var(--color-ink-900)]/50 flex items-end sm:items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-[var(--radius-card)] shadow-elevated max-w-sm w-full p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="font-display font-semibold text-lg text-[var(--color-ink-900)] mb-1">
+          {org.name}
+        </h3>
+        <p className="text-sm text-[var(--color-ink-500)] mb-4">
+          {org.area}
+          {org.ward ? ` · ${org.ward}` : ""}
+        </p>
+
+        {lat != null && lng != null ? (
+          <div className="mb-4">
+            <LocationDisplay lat={lat} lng={lng} label={org.name} height={200} />
+            <a
+              href={`https://www.openstreetmap.org/directions?from=&to=${lat}%2C${lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm text-[var(--color-emerald-700)] font-medium hover:underline mt-2"
+            >
+              📍 Get directions
+            </a>
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--color-ink-500)] bg-[var(--color-cream-100)] rounded-lg px-3 py-2.5 mb-4">
+            This shop hasn't pinned their exact location yet — you can still
+            order and they'll coordinate delivery with you directly.
+          </p>
+        )}
+
+        <button
+          onClick={onClose}
+          className="w-full text-sm text-[var(--color-ink-500)] text-center py-2"
+        >
+          Close
+        </button>
+      </div>
     </div>
   );
 }
