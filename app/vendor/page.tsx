@@ -29,6 +29,7 @@ import type {
   MarketingCampaign,
   RiderProfile,
   ServiceRequest,
+  BookingSlot,
 } from "@/lib/types";
 
 const inputClass =
@@ -126,6 +127,7 @@ export default function VendorPage() {
               <option value="MARKETPLACE">Marketplace (products)</option>
               <option value="PHARMACY">Pharmacy</option>
               <option value="SERVICES">Services</option>
+              <option value="EDUCATION">Education / Tutoring / Consultation</option>
             </select>
           </div>
           <div>
@@ -181,13 +183,14 @@ type VariantDraft = {
   priceOverride: string;
 };
 
-type Tab = "home" | "products" | "orders" | "bookings" | "marketing" | "settings";
+type Tab = "home" | "products" | "orders" | "bookings" | "slots" | "marketing" | "settings";
 
 const NAV_ITEMS: { id: Tab; label: string; icon: string }[] = [
   { id: "home", label: "Home", icon: "●" },
   { id: "products", label: "Products", icon: "▦" },
   { id: "orders", label: "Orders", icon: "▤" },
   { id: "bookings", label: "Bookings", icon: "📅" },
+  { id: "slots", label: "My Schedule", icon: "🗓" },
   { id: "marketing", label: "Marketing", icon: "◆" },
   { id: "settings", label: "Settings", icon: "⚙" },
 ];
@@ -200,9 +203,11 @@ function VendorDashboard({ org, token }: { org: Organization; token: string }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const isServices = org.vertical === "SERVICES";
+  const isEducation = org.vertical === "EDUCATION";
   const navItems = NAV_ITEMS.filter((item) => {
     if (item.id === "bookings") return isServices;
-    if (item.id === "products") return !isServices;
+    if (item.id === "slots") return isEducation;
+    if (item.id === "products") return !isServices && !isEducation;
     return true;
   });
 
@@ -343,6 +348,8 @@ function VendorDashboard({ org, token }: { org: Organization; token: string }) {
             <OrdersTab org={org} token={token} orders={orders} setOrders={setOrders} />
           ) : tab === "bookings" ? (
             <BookingsTab org={org} token={token} bookings={bookings} setBookings={setBookings} />
+          ) : tab === "slots" ? (
+            <SlotsTab org={org} token={token} />
           ) : tab === "marketing" ? (
             <MarketingTab org={org} token={token} />
           ) : (
@@ -938,6 +945,237 @@ function ProductForm({
         </button>
       </div>
     </form>
+  );
+}
+
+function SlotsTab({ org, token }: { org: Organization; token: string }) {
+  const [slots, setSlots] = useState<BookingSlot[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    date: "",
+    startTime: "",
+    endTime: "",
+    price: "",
+    isOnline: true,
+    location: "",
+  });
+  const [meetingLinkDraft, setMeetingLinkDraft] = useState<Record<string, string>>({});
+
+  function load() {
+    api
+      .get<BookingSlot[]>(`/organizations/${org.id}/slots/all`, token)
+      .then(setSlots)
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function createSlot(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.title || !form.date || !form.startTime || !form.endTime || !form.price) return;
+    const startAt = new Date(`${form.date}T${form.startTime}`).toISOString();
+    const endAt = new Date(`${form.date}T${form.endTime}`).toISOString();
+    await api.post(
+      "/slots",
+      {
+        organizationId: org.id,
+        title: form.title,
+        description: form.description || undefined,
+        startAt,
+        endAt,
+        price: Number(form.price),
+        isOnline: form.isOnline,
+        location: form.isOnline ? undefined : form.location || undefined,
+      },
+      token,
+    );
+    setForm({ title: "", description: "", date: "", startTime: "", endTime: "", price: "", isOnline: true, location: "" });
+    setShowForm(false);
+    load();
+  }
+
+  async function cancelSlot(id: string) {
+    if (!window.confirm("Cancel this slot? If it's already booked, the student will be refunded (if paid by wallet).")) return;
+    await api.patch(`/slots/${id}/cancel`, {}, token);
+    load();
+  }
+
+  async function saveMeetingLink(bookingId: string) {
+    const link = meetingLinkDraft[bookingId];
+    if (!link) return;
+    await api.patch(`/bookings/${bookingId}/meeting-link`, { meetingLink: link }, token);
+    load();
+  }
+
+  async function markCompleted(bookingId: string) {
+    await api.patch(`/bookings/${bookingId}/complete`, {}, token);
+    load();
+  }
+
+  if (loading) return <p className="text-[var(--color-ink-500)]">Loading...</p>;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-display font-semibold text-lg text-[var(--color-ink-900)]">
+          My Schedule
+        </h2>
+        <button
+          onClick={() => setShowForm((v) => !v)}
+          className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)]"
+        >
+          {showForm ? "Cancel" : "+ Publish a slot"}
+        </button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={createSlot} className="bg-white rounded-[var(--radius-card)] shadow-card p-5 space-y-3 mb-6">
+          <input
+            required
+            placeholder="e.g. 1-on-1 IELTS Speaking Practice"
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            className={inputClass + " w-full"}
+          />
+          <textarea
+            placeholder="Description (optional)"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            className={inputClass + " w-full"}
+            rows={2}
+          />
+          <div className="grid grid-cols-3 gap-2">
+            <input
+              required
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+              className={inputClass}
+            />
+            <input
+              required
+              type="time"
+              value={form.startTime}
+              onChange={(e) => setForm({ ...form, startTime: e.target.value })}
+              className={inputClass}
+            />
+            <input
+              required
+              type="time"
+              value={form.endTime}
+              onChange={(e) => setForm({ ...form, endTime: e.target.value })}
+              className={inputClass}
+            />
+          </div>
+          <div className="flex gap-2 items-center">
+            <input
+              required
+              type="number"
+              min={0}
+              placeholder="Price (৳)"
+              value={form.price}
+              onChange={(e) => setForm({ ...form, price: e.target.value })}
+              className={inputClass}
+            />
+            <label className="flex items-center gap-1.5 text-sm text-[var(--color-ink-700)]">
+              <input
+                type="checkbox"
+                checked={form.isOnline}
+                onChange={(e) => setForm({ ...form, isOnline: e.target.checked })}
+              />
+              Online session
+            </label>
+          </div>
+          {!form.isOnline && (
+            <input
+              placeholder="In-person location"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              className={inputClass + " w-full"}
+            />
+          )}
+          <button
+            type="submit"
+            className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-5 py-2.5 text-sm font-medium hover:bg-[var(--color-emerald-900)]"
+          >
+            Publish slot
+          </button>
+        </form>
+      )}
+
+      {slots.length === 0 && (
+        <p className="text-[var(--color-ink-500)]">No slots published yet.</p>
+      )}
+      <div className="space-y-3">
+        {slots.map((slot) => (
+          <div key={slot.id} className="bg-white rounded-[var(--radius-card)] shadow-card p-4">
+            <div className="flex items-start justify-between flex-wrap gap-2">
+              <div>
+                <p className="font-semibold text-[var(--color-ink-900)]">{slot.title}</p>
+                <p className="text-sm text-[var(--color-ink-500)]">
+                  {new Date(slot.startAt).toLocaleString()} – {new Date(slot.endAt).toLocaleTimeString()} · ৳{slot.price}
+                  {slot.isOnline ? " · Online" : ` · ${slot.location}`}
+                </p>
+              </div>
+              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                slot.status === "OPEN" ? "bg-blue-100 text-blue-800" :
+                slot.status === "BOOKED" ? "bg-purple-100 text-purple-800" :
+                slot.status === "COMPLETED" ? "bg-green-100 text-green-800" :
+                "bg-red-100 text-red-800"
+              }`}>
+                {slot.status}
+              </span>
+            </div>
+            {slot.booking && (
+              <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
+                <p className="text-sm text-[var(--color-ink-700)] mb-2">
+                  Booked by {slot.booking.student?.fullName} · {slot.booking.student?.phone}
+                  {slot.booking.note && <> — "{slot.booking.note}"</>}
+                </p>
+                {slot.isOnline && slot.status === "BOOKED" && (
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      placeholder="Paste meeting link (Google Meet/Zoom)"
+                      defaultValue={slot.meetingLink ?? ""}
+                      onChange={(e) => setMeetingLinkDraft((p) => ({ ...p, [slot.booking!.id]: e.target.value }))}
+                      className={inputClass + " flex-1"}
+                    />
+                    <button
+                      onClick={() => saveMeetingLink(slot.booking!.id)}
+                      className="bg-[var(--color-cream-100)] px-3 py-2 rounded-[10px] text-sm"
+                    >
+                      Save link
+                    </button>
+                  </div>
+                )}
+                {slot.status === "BOOKED" && (
+                  <button
+                    onClick={() => markCompleted(slot.booking!.id)}
+                    className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-4 py-1.5 text-xs font-medium hover:bg-[var(--color-emerald-900)]"
+                  >
+                    Mark session completed
+                  </button>
+                )}
+              </div>
+            )}
+            {(slot.status === "OPEN" || slot.status === "BOOKED") && (
+              <button
+                onClick={() => cancelSlot(slot.id)}
+                className="text-xs text-red-600 mt-2"
+              >
+                Cancel slot
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

@@ -1,5 +1,5 @@
 export type UserRole = "BUYER" | "VENDOR" | "PROVIDER" | "ADMIN" | "RIDER";
-export type Vertical = "MARKETPLACE" | "PHARMACY" | "SERVICES";
+export type Vertical = "MARKETPLACE" | "PHARMACY" | "SERVICES" | "EDUCATION";
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type OrderStatus =
   | "PENDING"
@@ -325,6 +325,50 @@ export interface ServiceRequest {
   shopReview?: ShopReview | null;
   escrowStatus?: EscrowStatus;
   buyerConfirmedAt?: string | null;
+}
+
+export type BookingSlotStatus = "OPEN" | "BOOKED" | "CANCELLED" | "COMPLETED";
+
+export interface SlotBookingStudent {
+  id: string;
+  fullName: string;
+  phone: string;
+}
+
+export interface SlotBooking {
+  id: string;
+  slotId: string;
+  slot?: BookingSlot;
+  studentId: string;
+  student?: SlotBookingStudent;
+  note?: string | null;
+  paymentMethod?: PaymentMethod | null;
+  paymentVerification?: PaymentVerificationStatus;
+  paymentTrxId?: string | null;
+  escrowStatus?: EscrowStatus;
+  buyerConfirmedAt?: string | null;
+  cancelledAt?: string | null;
+  createdAt: string;
+  shopReview?: ShopReview | null;
+}
+
+export interface BookingSlot {
+  id: string;
+  organizationId: string;
+  organization?: Organization;
+  categoryId?: string | null;
+  category?: Category | null;
+  title: string;
+  description?: string | null;
+  startAt: string;
+  endAt: string;
+  price: string;
+  isOnline: boolean;
+  meetingLink?: string | null;
+  location?: string | null;
+  status: BookingSlotStatus;
+  createdAt: string;
+  booking?: SlotBooking | null;
 }
 
 export type WalletTopupStatus = "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED";

@@ -59,6 +59,12 @@ export default function Navbar() {
           >
             Services
           </Link>
+          <Link
+            href="/education"
+            className="text-[var(--color-ink-700)] hover:text-[var(--color-emerald-700)] transition-colors"
+          >
+            Tutoring
+          </Link>
 
           {!user && (
             <>
@@ -101,6 +107,14 @@ export default function Navbar() {
                   className="text-[var(--color-ink-700)] hover:text-[var(--color-emerald-700)] transition-colors"
                 >
                   Wallet
+                </Link>
+              )}
+              {user.role === "BUYER" && (
+                <Link
+                  href="/sessions"
+                  className="text-[var(--color-ink-700)] hover:text-[var(--color-emerald-700)] transition-colors"
+                >
+                  My sessions
                 </Link>
               )}
               {roleLink && (
@@ -178,6 +192,13 @@ export default function Navbar() {
           >
             Services
           </Link>
+          <Link
+            href="/education"
+            onClick={() => setMenuOpen(false)}
+            className="py-2.5 text-[var(--color-ink-700)]"
+          >
+            Tutoring
+          </Link>
           {!user && (
             <Link
               href="/login"
@@ -214,6 +235,15 @@ export default function Navbar() {
                   className="py-2.5 text-[var(--color-ink-700)]"
                 >
                   Wallet
+                </Link>
+              )}
+              {user.role === "BUYER" && (
+                <Link
+                  href="/sessions"
+                  onClick={() => setMenuOpen(false)}
+                  className="py-2.5 text-[var(--color-ink-700)]"
+                >
+                  My sessions
                 </Link>
               )}
               {roleLink && (
