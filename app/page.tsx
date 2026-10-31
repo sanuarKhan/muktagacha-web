@@ -69,8 +69,8 @@ export default function HomePage() {
       <section className="relative overflow-hidden">
         <div className="absolute inset-0">
           <Image
-            src="https://images.pexels.com/photos/37819283/pexels-photo-37819283.jpeg?auto=compress&cs=tinysrgb&h=1200&w=1600"
-            alt="A busy street in Dhaka, Bangladesh"
+            src="/banner/hero-banner.jpg"
+            alt="Muktagacha — shop local online"
             fill
             priority
             className="object-cover"
