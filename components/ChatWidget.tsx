@@ -6,30 +6,54 @@ import { useChatSocket } from "@/lib/use-chat-socket";
 import { api } from "@/lib/api";
 import type { Conversation, Message } from "@/lib/types";
 
+type DirectConversation = {
+  id: string;
+  userAId: string;
+  userBId: string;
+  userA?: { id: string; fullName: string; role: string };
+  userB?: { id: string; fullName: string; role: string };
+  messages?: Message[];
+};
+
+type Tab = "shops" | "people";
+
 // Floating, glassmorphic chat launcher + panel — shown site-wide once a
-// user is logged in. Lists the buyer's conversations with shops (or, for a
-// vendor, every conversation across their shop(s)) and opens a live thread.
+// user is logged in. Two tabs: "Shops" (buyer<->vendor conversations) and
+// "People" (buyer<->buyer direct messenger, like a normal messenger).
 // Matches the brief: "transparent... like we did for Skode Digital" — a
 // frosted/blurred glass surface rather than a solid opaque panel.
 export default function ChatWidget() {
   const { user, token } = useAuth();
   const socketRef = useChatSocket(token);
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>("shops");
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [directConvos, setDirectConvos] = useState<DirectConversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const unreadTotal = conversations.reduce((sum, c) => {
-    const last = c.messages?.[0];
-    return sum + (last && !last.readAt && last.senderId !== user?.id ? 1 : 0);
-  }, 0);
+  const isDirect = tab === "people";
+
+  const unreadTotal =
+    conversations.reduce((sum, c) => {
+      const last = c.messages?.[0];
+      return sum + (last && !last.readAt && last.senderId !== user?.id ? 1 : 0);
+    }, 0) +
+    directConvos.reduce((sum, c) => {
+      const last = c.messages?.[0];
+      return sum + (last && !last.readAt && last.senderId !== user?.id ? 1 : 0);
+    }, 0);
 
   function loadConversations() {
     if (!token) return;
     api.get<Conversation[]>("/chat/conversations", token).then(setConversations).catch(() => {});
+    api
+      .get<DirectConversation[]>("/direct-messages/conversations", token)
+      .then(setDirectConvos)
+      .catch(() => {});
   }
 
   useEffect(() => {
@@ -42,30 +66,34 @@ export default function ChatWidget() {
 
   useEffect(() => {
     if (!activeId || !token) return;
+    const base = isDirect ? "/direct-messages" : "/chat";
     setLoading(true);
     api
-      .get<Message[]>(`/chat/conversations/${activeId}/messages`, token)
+      .get<Message[]>(`${base}/conversations/${activeId}/messages`, token)
       .then(setMessages)
       .finally(() => setLoading(false));
-    api.post(`/chat/conversations/${activeId}/read`, {}, token).catch(() => {});
+    api.post(`${base}/conversations/${activeId}/read`, {}, token).catch(() => {});
 
     const socket = socketRef.current;
     if (socket) {
-      socket.emit("conversation:join", { conversationId: activeId });
+      const joinEvent = isDirect ? "direct:join" : "conversation:join";
+      const leaveEvent = isDirect ? "direct:leave" : "conversation:leave";
+      const msgEvent = isDirect ? "direct:message" : "conversation:message";
+      socket.emit(joinEvent, { conversationId: activeId });
       const handler = (msg: Message) => {
         if (msg.conversationId === activeId) {
           setMessages((prev) => [...prev, msg]);
         }
         loadConversations();
       };
-      socket.on("conversation:message", handler);
+      socket.on(msgEvent, handler);
       return () => {
-        socket.off("conversation:message", handler);
-        socket.emit("conversation:leave", { conversationId: activeId });
+        socket.off(msgEvent, handler);
+        socket.emit(leaveEvent, { conversationId: activeId });
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId, token]);
+  }, [activeId, token, isDirect]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -73,19 +101,32 @@ export default function ChatWidget() {
 
   async function handleSend() {
     if (!draft.trim() || !activeId || !token) return;
+    const base = isDirect ? "/direct-messages" : "/chat";
     const body = draft.trim();
     setDraft("");
     try {
-      const msg = await api.post<Message>(`/chat/conversations/${activeId}/messages`, { body }, token);
+      const msg = await api.post<Message>(`${base}/conversations/${activeId}/messages`, { body }, token);
       setMessages((prev) => [...prev, msg]);
     } catch {
       setDraft(body);
     }
   }
 
+  function switchTab(next: Tab) {
+    setTab(next);
+    setActiveId(null);
+    setMessages([]);
+  }
+
   if (!user) return null;
 
-  const activeConversation = conversations.find((c) => c.id === activeId);
+  const activeShopConvo = conversations.find((c) => c.id === activeId);
+  const activeDirectConvo = directConvos.find((c) => c.id === activeId);
+  const directPeerName = (c: DirectConversation | undefined) => {
+    if (!c) return "";
+    const peer = c.userAId === user.id ? c.userB : c.userA;
+    return peer?.fullName ?? "Conversation";
+  };
 
   return (
     <>
@@ -136,9 +177,11 @@ export default function ChatWidget() {
               >
                 <span>←</span>
                 <span className="truncate max-w-[12rem]">
-                  {user.role === "VENDOR"
-                    ? activeConversation?.buyer?.fullName
-                    : activeConversation?.organization?.name}
+                  {isDirect
+                    ? directPeerName(activeDirectConvo)
+                    : user.role === "VENDOR"
+                      ? activeShopConvo?.buyer?.fullName
+                      : activeShopConvo?.organization?.name}
                 </span>
               </button>
             ) : (
@@ -149,14 +192,39 @@ export default function ChatWidget() {
             </button>
           </div>
 
+          {/* Tabs (hidden once a thread is open) */}
+          {!activeId && (
+            <div className="flex px-2 pt-2 gap-1">
+              {(["shops", "people"] as Tab[]).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => switchTab(t)}
+                  className={`flex-1 text-xs font-medium py-1.5 rounded-[var(--radius-pill)] transition-colors ${
+                    tab === t ? "bg-[var(--color-emerald-700)] text-white" : "text-[var(--color-ink-700)] hover:bg-white/30"
+                  }`}
+                >
+                  {t === "shops" ? "Shops" : "People"}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Body */}
           <div className="flex-1 overflow-y-auto">
             {!activeId ? (
-              <ConversationList
-                conversations={conversations}
-                currentUserId={user.id}
-                onSelect={setActiveId}
-              />
+              isDirect ? (
+                <DirectConversationList
+                  conversations={directConvos}
+                  currentUserId={user.id}
+                  onSelect={setActiveId}
+                />
+              ) : (
+                <ConversationList
+                  conversations={conversations}
+                  currentUserId={user.id}
+                  onSelect={setActiveId}
+                />
+              )
             ) : (
               <div className="flex flex-col h-full">
                 <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
@@ -247,6 +315,50 @@ function ConversationList({
             <div className="min-w-0">
               <p className="text-sm font-medium text-[var(--color-ink-900)] truncate">
                 {c.organization?.name ?? c.buyer?.fullName ?? "Conversation"}
+              </p>
+              {last && (
+                <p className="text-xs text-[var(--color-ink-500)] truncate">{last.body}</p>
+              )}
+            </div>
+            {unread && <span className="w-2 h-2 rounded-full bg-[var(--color-gold-500)] shrink-0" />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function DirectConversationList({
+  conversations,
+  currentUserId,
+  onSelect,
+}: {
+  conversations: DirectConversation[];
+  currentUserId: string;
+  onSelect: (id: string) => void;
+}) {
+  if (conversations.length === 0) {
+    return (
+      <p className="text-center text-xs text-[var(--color-ink-500)] mt-8 px-4">
+        No conversations yet. Message someone from the Community page to start one.
+      </p>
+    );
+  }
+  return (
+    <div className="divide-y divide-white/30">
+      {conversations.map((c) => {
+        const peer = c.userAId === currentUserId ? c.userB : c.userA;
+        const last = c.messages?.[0];
+        const unread = last && !last.readAt && last.senderId !== currentUserId;
+        return (
+          <button
+            key={c.id}
+            onClick={() => onSelect(c.id)}
+            className="w-full text-left px-4 py-3 hover:bg-white/30 transition-colors flex items-center justify-between gap-2"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[var(--color-ink-900)] truncate">
+                {peer?.fullName ?? "Conversation"}
               </p>
               {last && (
                 <p className="text-xs text-[var(--color-ink-500)] truncate">{last.body}</p>

@@ -23,6 +23,7 @@ function TopicPage() {
   const [posts, setPosts] = useState<GroupPost[]>([]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
+  const [messagedIds, setMessagedIds] = useState<Set<string>>(new Set());
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -64,6 +65,16 @@ function TopicPage() {
     }
   }
 
+  async function handleMessage(recipientId: string) {
+    if (!token) return;
+    await api.post(
+      "/direct-messages/conversations",
+      { recipientId, body: "Hi! Saw your post in the community." },
+      token
+    );
+    setMessagedIds((prev) => new Set(prev).add(recipientId));
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-5 sm:px-8 py-10 flex flex-col h-[calc(100vh-4rem)]">
       <Link href={`/community/${groupId}`} className="text-sm text-[var(--color-ink-500)] mb-3 inline-block">
@@ -77,12 +88,22 @@ function TopicPage() {
         ) : (
           posts.map((p) => (
             <div key={p.id} className="bg-white rounded-[var(--radius-sm)] shadow-card px-3.5 py-2.5">
-              <div className="flex items-baseline gap-2 mb-0.5">
-                <span className="text-sm font-medium text-[var(--color-ink-900)]">
-                  {p.author?.fullName ?? "Someone"}
-                </span>
-                {p.authorId === user?.id && (
-                  <span className="text-[10px] text-[var(--color-emerald-700)]">you</span>
+              <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-sm font-medium text-[var(--color-ink-900)]">
+                    {p.author?.fullName ?? "Someone"}
+                  </span>
+                  {p.authorId === user?.id && (
+                    <span className="text-[10px] text-[var(--color-emerald-700)]">you</span>
+                  )}
+                </div>
+                {p.authorId !== user?.id && (
+                  <button
+                    onClick={() => handleMessage(p.authorId)}
+                    className="text-xs text-[var(--color-emerald-700)] font-medium shrink-0"
+                  >
+                    {messagedIds.has(p.authorId) ? "Sent ✓" : "Message"}
+                  </button>
                 )}
               </div>
               <p className="text-sm text-[var(--color-ink-700)]">{p.body}</p>

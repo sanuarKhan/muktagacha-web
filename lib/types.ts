@@ -201,6 +201,8 @@ export interface ShopQuestionReply {
   authorId: string;
   author?: ChatUser;
   body: string;
+  score: number;
+  myVote?: "UP" | "DOWN" | null;
   createdAt: string;
 }
 

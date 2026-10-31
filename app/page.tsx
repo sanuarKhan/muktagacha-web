@@ -424,13 +424,26 @@ function ShopQABoard({ organizationId }: { organizationId: string }) {
     load();
   }
 
+  async function handleVote(replyId: string, direction: "UP" | "DOWN") {
+    if (!token) return;
+    const result = await api.post<{ score: number }>(`/chat/replies/${replyId}/vote/${direction.toLowerCase()}`, {}, token);
+    setQuestions((prev) =>
+      prev.map((q) => ({
+        ...q,
+        replies: q.replies
+          .map((r) => (r.id === replyId ? { ...r, score: result.score } : r))
+          .sort((a, b) => b.score - a.score),
+      }))
+    );
+  }
+
   return (
     <div className="border-t border-[var(--color-border)] pt-4 mb-2">
       <h4 className="text-sm font-semibold text-[var(--color-ink-900)] mb-2">
         Questions &amp; answers
       </h4>
       <p className="text-xs text-[var(--color-ink-500)] mb-3">
-        Public — anyone can see and help answer.
+        Public — ask a question, the community answers, best answers rise to the top.
       </p>
 
       {user && token && (
@@ -461,11 +474,30 @@ function ShopQABoard({ organizationId }: { organizationId: string }) {
               <p className="text-xs font-medium text-[var(--color-ink-900)]">{q.asker?.fullName ?? "Someone"}</p>
               <p className="text-sm text-[var(--color-ink-700)] mb-1.5">{q.body}</p>
               {q.replies.map((r) => (
-                <div key={r.id} className="ml-3 mt-1 text-sm">
-                  <span className="font-medium text-[var(--color-emerald-700)]">
-                    {r.author?.fullName ?? "Reply"}:
-                  </span>{" "}
-                  <span className="text-[var(--color-ink-700)]">{r.body}</span>
+                <div key={r.id} className="ml-1 mt-1.5 flex gap-2 items-start">
+                  <div className="flex flex-col items-center shrink-0 pt-0.5">
+                    <button
+                      onClick={() => handleVote(r.id, "UP")}
+                      className="text-xs leading-none text-[var(--color-ink-500)] hover:text-[var(--color-emerald-700)]"
+                      aria-label="Upvote"
+                    >
+                      ▲
+                    </button>
+                    <span className="text-xs font-semibold text-[var(--color-ink-700)]">{r.score}</span>
+                    <button
+                      onClick={() => handleVote(r.id, "DOWN")}
+                      className="text-xs leading-none text-[var(--color-ink-500)] hover:text-red-600"
+                      aria-label="Downvote"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                  <div className="text-sm">
+                    <span className="font-medium text-[var(--color-emerald-700)]">
+                      {r.author?.fullName ?? "Reply"}:
+                    </span>{" "}
+                    <span className="text-[var(--color-ink-700)]">{r.body}</span>
+                  </div>
                 </div>
               ))}
               {user && token && (
