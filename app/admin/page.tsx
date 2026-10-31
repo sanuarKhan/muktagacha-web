@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
-import type { Organization, Product, Category, Order, RiderProfile } from "@/lib/types";
+import type { Organization, Product, Category, Order, RiderProfile, WalletTopup } from "@/lib/types";
 
 interface AdminStats {
   totalUsers: number;
@@ -30,7 +30,7 @@ interface FraudFlag {
   order: Order & { buyer?: { fullName: string; phone: string; createdAt: string } };
 }
 
-type Tab = "pending" | "vendors" | "catalog" | "categories" | "orders" | "riders" | "fraud" | "verification";
+type Tab = "pending" | "vendors" | "catalog" | "categories" | "orders" | "riders" | "fraud" | "verification" | "wallet";
 
 const inputClass =
   "border border-[var(--color-border)] rounded-[10px] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]";
@@ -54,6 +54,7 @@ export default function AdminPage() {
   const [newCategory, setNewCategory] = useState({ name: "", vertical: "MARKETPLACE" });
   const [fraudFlags, setFraudFlags] = useState<FraudFlag[]>([]);
   const [pendingVerifications, setPendingVerifications] = useState<Organization[]>([]);
+  const [pendingTopups, setPendingTopups] = useState<WalletTopup[]>([]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -78,8 +79,9 @@ export default function AdminPage() {
       api.get<RiderProfile[]>("/riders/approved", token),
       api.get<FraudFlag[]>("/admin/fraud-flags", token),
       api.get<Organization[]>("/organizations/pending-verifications", token),
+      api.get<WalletTopup[]>("/wallet/topups/pending", token),
     ])
-      .then(([p, v, s, c, cat, ord, pendRiders, apprRiders, flags, pendVerif]) => {
+      .then(([p, v, s, c, cat, ord, pendRiders, apprRiders, flags, pendVerif, pendTopups]) => {
         setPending(p);
         setAllVendors(v);
         setStats(s);
@@ -90,6 +92,7 @@ export default function AdminPage() {
         setApprovedRiders(apprRiders);
         setFraudFlags(flags);
         setPendingVerifications(pendVerif);
+        setPendingTopups(pendTopups);
       })
       .finally(() => setLoading(false));
   }
@@ -134,6 +137,12 @@ export default function AdminPage() {
     if (!token) return;
     const note = window.prompt("Reason for rejecting this verification? (shown to the vendor)") ?? undefined;
     await api.patch(`/organizations/${id}/reject-verification`, { note }, token);
+    loadAll();
+  }
+
+  async function reviewTopup(id: string, decision: "VERIFIED" | "REJECTED") {
+    if (!token) return;
+    await api.patch(`/wallet/topups/${id}/review`, { decision }, token);
     loadAll();
   }
 
@@ -212,6 +221,7 @@ export default function AdminPage() {
           <TabButton active={tab === "riders"} onClick={() => setTab("riders")} label={`Riders (${pendingRiders.length} pending)`} />
           <TabButton active={tab === "fraud"} onClick={() => setTab("fraud")} label={`Fraud review (${fraudFlags.length})`} />
           <TabButton active={tab === "verification"} onClick={() => setTab("verification")} label={`Verification (${pendingVerifications.length})`} />
+          <TabButton active={tab === "wallet"} onClick={() => setTab("wallet")} label={`Wallet top-ups (${pendingTopups.length})`} />
         </div>
 
         {tab === "pending" && (
@@ -641,6 +651,45 @@ export default function AdminPage() {
                       <span className="text-xs text-[var(--color-ink-500)] block mt-1">NID</span>
                     </a>
                   )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab === "wallet" && (
+          <div className="space-y-3">
+            <p className="text-sm text-[var(--color-ink-500)] mb-2">
+              Buyers who submitted a bKash/Nagad transaction ID to top up
+              their wallet. Verify against your own statement before
+              approving — credit is added the moment you approve.
+            </p>
+            {pendingTopups.length === 0 && (
+              <p className="text-[var(--color-ink-500)]">No pending wallet top-ups.</p>
+            )}
+            {pendingTopups.map((t: any) => (
+              <div key={t.id} className="bg-white rounded-[var(--radius-card)] shadow-card p-4 flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <p className="font-semibold text-[var(--color-ink-900)]">
+                    {t.wallet?.user?.fullName ?? "User"} · ৳{t.amount}
+                  </p>
+                  <p className="text-sm text-[var(--color-ink-500)]">
+                    {t.method} · TrxID: {t.trxId ?? "—"} · {t.wallet?.user?.phone}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => reviewTopup(t.id, "VERIFIED")}
+                    className="bg-[var(--color-emerald-700)] text-white px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors"
+                  >
+                    Verify &amp; add credit
+                  </button>
+                  <button
+                    onClick={() => reviewTopup(t.id, "REJECTED")}
+                    className="bg-red-50 text-red-700 px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-red-100 transition-colors"
+                  >
+                    Reject
+                  </button>
                 </div>
               </div>
             ))}

@@ -30,6 +30,7 @@ export default function OrdersPage() {
   const [gifts, setGifts] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [rated, setRated] = useState<Record<string, boolean>>({});
+  const [shopRated, setShopRated] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (authLoading) return;
@@ -58,6 +59,12 @@ export default function OrdersPage() {
     if (!token) return;
     const updated = await api.post<Order>(`/orders/${orderId}/prescription`, { imageUrl }, token);
     setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+  }
+
+  async function rateShop(orderId: string, rating: number) {
+    if (!token) return;
+    await api.post(`/orders/${orderId}/review`, { rating }, token);
+    setShopRated((prev) => ({ ...prev, [orderId]: true }));
   }
 
   if (authLoading || loading) {
@@ -186,6 +193,27 @@ export default function OrdersPage() {
             {order.requiresPrescription && order.prescriptionStatus === "APPROVED" && (
               <p className="text-xs text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] rounded-lg px-3 py-2 mt-2">
                 ✓ Prescription approved.
+              </p>
+            )}
+            {order.status === "COMPLETED" && !shopRated[order.id] && !order.shopReview && (
+              <div className="mt-2 pt-2 border-t border-[var(--color-border)] flex items-center gap-1">
+                <span className="text-xs text-[var(--color-ink-500)] mr-1">
+                  Rate this shop:
+                </span>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => rateShop(order.id, n)}
+                    className="text-lg text-[var(--color-gold-600)] hover:scale-110 transition-transform"
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            )}
+            {(shopRated[order.id] || order.shopReview) && (
+              <p className="text-xs text-[var(--color-emerald-700)] mt-2 pt-2 border-t border-[var(--color-border)]">
+                Thanks for rating this shop!
               </p>
             )}
             {order.status === "COMPLETED" && order.riderId && !rated[order.id] && (

@@ -333,10 +333,17 @@ function ShopInfoModal({ org, onClose }: { org: Organization; onClose: () => voi
             </span>
           )}
         </h3>
-        <p className="text-sm text-[var(--color-ink-500)] mb-4">
+        <p className="text-sm text-[var(--color-ink-500)] mb-1">
           {org.area}
           {org.ward ? ` · ${org.ward}` : ""}
         </p>
+        {org.reviewCount && org.reviewCount > 0 ? (
+          <p className="text-sm text-[var(--color-gold-600)] mb-4">
+            ★ {Number(org.avgRating).toFixed(1)} ({org.reviewCount} review{org.reviewCount === 1 ? "" : "s"})
+          </p>
+        ) : (
+          <p className="text-xs text-[var(--color-ink-300)] mb-4">No reviews yet</p>
+        )}
 
         {lat != null && lng != null ? (
           <div className="mb-4">

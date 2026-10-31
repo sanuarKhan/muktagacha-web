@@ -95,6 +95,14 @@ export default function Navbar() {
                   My bookings
                 </Link>
               )}
+              {user.role === "BUYER" && (
+                <Link
+                  href="/wallet"
+                  className="text-[var(--color-ink-700)] hover:text-[var(--color-emerald-700)] transition-colors"
+                >
+                  Wallet
+                </Link>
+              )}
               {roleLink && (
                 <Link
                   href={roleLink.href}
@@ -197,6 +205,15 @@ export default function Navbar() {
                   className="py-2.5 text-[var(--color-ink-700)]"
                 >
                   My bookings
+                </Link>
+              )}
+              {user.role === "BUYER" && (
+                <Link
+                  href="/wallet"
+                  onClick={() => setMenuOpen(false)}
+                  className="py-2.5 text-[var(--color-ink-700)]"
+                >
+                  Wallet
                 </Link>
               )}
               {roleLink && (

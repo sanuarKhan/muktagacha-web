@@ -7,7 +7,7 @@ export type OrderStatus =
   | "OUT_FOR_DELIVERY"
   | "COMPLETED"
   | "CANCELLED";
-export type PaymentMethod = "CASH_ON_DELIVERY" | "BKASH" | "NAGAD" | "SKODEPAY";
+export type PaymentMethod = "CASH_ON_DELIVERY" | "BKASH" | "NAGAD" | "SKODEPAY" | "WALLET";
 export type PaymentVerificationStatus =
   | "NOT_SUBMITTED"
   | "PENDING_VERIFICATION"
@@ -48,6 +48,20 @@ export interface Organization {
   nidUrl?: string | null;
   verificationNote?: string | null;
   verifiedAt?: string | null;
+  avgRating?: string | null;
+  reviewCount?: number;
+}
+
+export interface ShopReview {
+  id: string;
+  organizationId: string;
+  buyerId: string;
+  buyer?: { fullName: string };
+  orderId?: string | null;
+  serviceRequestId?: string | null;
+  rating: number;
+  comment?: string | null;
+  createdAt: string;
 }
 
 export interface Category {
@@ -137,6 +151,7 @@ export interface Order {
   items: OrderItem[];
   organization?: Organization;
   buyer?: User;
+  shopReview?: ShopReview | null;
 }
 
 export interface AuthResponse {
@@ -303,4 +318,30 @@ export interface ServiceRequest {
   paymentTrxId?: string | null;
   createdAt: string;
   completedAt?: string | null;
+  shopReview?: ShopReview | null;
+}
+
+export type WalletTopupStatus = "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED";
+export type WalletTransactionType = "TOPUP" | "SPEND" | "REFUND";
+
+export interface WalletTransaction {
+  id: string;
+  walletId: string;
+  type: WalletTransactionType;
+  amount: string;
+  orderId?: string | null;
+  serviceRequestId?: string | null;
+  note?: string | null;
+  createdAt: string;
+}
+
+export interface WalletTopup {
+  id: string;
+  walletId: string;
+  wallet?: { user?: { fullName: string; phone: string } };
+  amount: string;
+  method: PaymentMethod;
+  trxId?: string | null;
+  status: WalletTopupStatus;
+  createdAt: string;
 }

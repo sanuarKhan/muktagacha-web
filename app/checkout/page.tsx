@@ -42,6 +42,7 @@ export default function CheckoutPage() {
   const [giftMessage, setGiftMessage] = useState("");
   const [giftAnonymous, setGiftAnonymous] = useState(false);
   const [giftAddress, setGiftAddress] = useState("");
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   const grouped = linesByOrganization();
   const total = lines.reduce(
@@ -53,6 +54,11 @@ export default function CheckoutPage() {
   const allVendorsHaveSkodePay =
     Object.keys(vendorOrgs).length > 0 &&
     Object.keys(grouped).every((orgId) => vendorOrgs[orgId]?.skodePayEnabled);
+
+  useEffect(() => {
+    if (!token) return;
+    api.get<{ balance: string }>("/wallet/balance", token).then((w) => setWalletBalance(Number(w.balance)));
+  }, [token]);
 
   // Fetch each vendor's org (for bKash/Nagad numbers to show at checkout)
   useEffect(() => {
@@ -122,6 +128,12 @@ export default function CheckoutPage() {
         );
         return;
       }
+    }
+    if (paymentMethod === "WALLET" && walletBalance !== null && walletBalance < total) {
+      setError(
+        `Your wallet balance (৳${walletBalance.toFixed(2)}) isn't enough for this order (৳${total}). Top up your wallet first.`,
+      );
+      return;
     }
     if (isGift) {
       if (!giftRecipient) {
@@ -399,6 +411,9 @@ export default function CheckoutPage() {
           <option value="CASH_ON_DELIVERY">Cash on Delivery</option>
           <option value="BKASH">bKash (pay vendor directly)</option>
           <option value="NAGAD">Nagad (pay vendor directly)</option>
+          {walletBalance !== null && (
+            <option value="WALLET">Wallet (balance ৳{walletBalance.toFixed(2)})</option>
+          )}
           {allVendorsHaveSkodePay && (
             <option value="SKODEPAY">SkodePay (secure online payment)</option>
           )}
@@ -408,6 +423,16 @@ export default function CheckoutPage() {
             Muktagacha doesn't process payments itself — you pay the vendor's
             own bKash/Nagad number directly, and they confirm your transaction
             ID before preparing your order.
+          </p>
+        )}
+        {paymentMethod === "WALLET" && (
+          <p className="text-xs text-[var(--color-ink-500)] mt-2">
+            Paid instantly from your Muktagacha wallet balance — no waiting for
+            vendor confirmation.{" "}
+            <a href="/wallet" className="text-[var(--color-emerald-700)] underline">
+              Manage your wallet
+            </a>
+            .
           </p>
         )}
         {paymentMethod === "SKODEPAY" && (

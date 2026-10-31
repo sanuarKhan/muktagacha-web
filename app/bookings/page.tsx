@@ -23,6 +23,7 @@ export default function BookingsPage() {
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState<string | null>(null);
   const [trxId, setTrxId] = useState("");
+  const [rated, setRated] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (authLoading) return;
@@ -42,16 +43,22 @@ export default function BookingsPage() {
     setBookings((prev) => prev.map((b) => (b.id === id ? updated : b)));
   }
 
-  async function submitPayment(id: string, paymentMethod: "CASH_ON_DELIVERY" | "BKASH" | "NAGAD") {
+  async function submitPayment(id: string, paymentMethod: "CASH_ON_DELIVERY" | "BKASH" | "NAGAD" | "WALLET") {
     if (!token) return;
     const updated = await api.post<ServiceRequest>(
       `/service-requests/${id}/payment`,
-      { paymentMethod, trxId: paymentMethod === "CASH_ON_DELIVERY" ? undefined : trxId },
+      { paymentMethod, trxId: paymentMethod === "BKASH" || paymentMethod === "NAGAD" ? trxId : undefined },
       token,
     );
     setBookings((prev) => prev.map((b) => (b.id === id ? updated : b)));
     setPaying(null);
     setTrxId("");
+  }
+
+  async function rateShop(requestId: string, rating: number) {
+    if (!token) return;
+    await api.post(`/service-requests/${requestId}/review`, { rating }, token);
+    setRated((prev) => ({ ...prev, [requestId]: true }));
   }
 
   if (authLoading || loading) {
@@ -122,6 +129,9 @@ export default function BookingsPage() {
                       <button onClick={() => submitPayment(b.id, "CASH_ON_DELIVERY")} className="text-xs bg-[var(--color-cream-100)] px-3 py-1.5 rounded-full">
                         Cash
                       </button>
+                      <button onClick={() => submitPayment(b.id, "WALLET")} className="text-xs bg-[var(--color-emerald-50)] text-[var(--color-emerald-700)] px-3 py-1.5 rounded-full font-medium">
+                        Pay from wallet
+                      </button>
                       <input
                         placeholder="bKash/Nagad TrxID"
                         value={trxId}
@@ -154,6 +164,26 @@ export default function BookingsPage() {
                 {b.paymentVerification && b.paymentMethod !== "CASH_ON_DELIVERY" && (
                   <> · {b.paymentVerification.replace(/_/g, " ")}</>
                 )}
+              </p>
+            )}
+
+            {b.status === "COMPLETED" && !rated[b.id] && !b.shopReview && (
+              <div className="mt-2 pt-2 border-t border-[var(--color-border)] flex items-center gap-1">
+                <span className="text-xs text-[var(--color-ink-500)] mr-1">Rate this provider:</span>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => rateShop(b.id, n)}
+                    className="text-lg text-[var(--color-gold-600)] hover:scale-110 transition-transform"
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            )}
+            {(rated[b.id] || b.shopReview) && (
+              <p className="text-xs text-[var(--color-emerald-700)] mt-2 pt-2 border-t border-[var(--color-border)]">
+                Thanks for rating this provider!
               </p>
             )}
           </div>
