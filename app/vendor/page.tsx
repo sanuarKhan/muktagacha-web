@@ -238,8 +238,13 @@ function VendorDashboard({ org, token }: { org: Organization; token: string }) {
           </div>
         )}
         <div className="flex-1">
-          <h1 className="font-display font-semibold text-xl text-[var(--color-ink-900)]">
+          <h1 className="font-display font-semibold text-xl text-[var(--color-ink-900)] flex items-center gap-2">
             {org.name}
+            {org.verificationStatus === "VERIFIED" && (
+              <span className="text-xs font-medium text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] px-2 py-0.5 rounded-full">
+                ✓ Verified
+              </span>
+            )}
           </h1>
           <span
             className={`inline-block text-xs px-2.5 py-0.5 rounded-full font-medium ${STATUS_STYLE[org.approvalStatus]}`}
@@ -1063,7 +1068,7 @@ function OrdersTab({
   );
 }
 
-type SettingsSection = "profile" | "payment" | "images" | "skodepay" | "location";
+type SettingsSection = "profile" | "payment" | "images" | "skodepay" | "location" | "verification";
 
 function MarketingTab({ org, token }: { org: Organization; token: string }) {
   const [contacts, setContacts] = useState<MarketingContact[]>([]);
@@ -1389,6 +1394,13 @@ function SettingsTab({ org, token }: { org: Organization; token: string }) {
   const [savingLocation, setSavingLocation] = useState(false);
   const [locationSaved, setLocationSaved] = useState(false);
 
+  const [tradeLicenseUrl, setTradeLicenseUrl] = useState<string | null>(org.tradeLicenseUrl ?? null);
+  const [nidUrl, setNidUrl] = useState<string | null>(org.nidUrl ?? null);
+  const [submittingVerification, setSubmittingVerification] = useState(false);
+  const [verificationSubmitted, setVerificationSubmitted] = useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [verificationStatus, setVerificationStatus] = useState(org.verificationStatus ?? "UNVERIFIED");
+
   async function savePaymentNumbers(e: React.FormEvent) {
     e.preventDefault();
     setSavingPayment(true);
@@ -1465,12 +1477,36 @@ function SettingsTab({ org, token }: { org: Organization; token: string }) {
     }
   }
 
+  async function submitVerification() {
+    if (!tradeLicenseUrl && !nidUrl) {
+      setVerificationError("Upload at least a trade license or an NID photo.");
+      return;
+    }
+    setSubmittingVerification(true);
+    setVerificationError(null);
+    setVerificationSubmitted(false);
+    try {
+      await api.patch(
+        `/organizations/${org.id}/verification`,
+        { tradeLicenseUrl, nidUrl },
+        token,
+      );
+      setVerificationStatus("PENDING_REVIEW");
+      setVerificationSubmitted(true);
+    } catch (err: any) {
+      setVerificationError(err?.message ?? "Could not submit for verification. Try again.");
+    } finally {
+      setSubmittingVerification(false);
+    }
+  }
+
   const SECTIONS: { id: SettingsSection; label: string }[] = [
     { id: "profile", label: "Shop profile" },
     { id: "payment", label: "Payment numbers" },
     { id: "images", label: "Image uploads" },
     { id: "skodepay", label: "SkodePay" },
     { id: "location", label: "Location" },
+    { id: "verification", label: "Verification" },
   ];
 
   return (
@@ -1740,6 +1776,61 @@ function SettingsTab({ org, token }: { org: Organization; token: string }) {
           >
             {savingLocation ? "Saving..." : "Save location"}
           </button>
+        </div>
+      )}
+
+      {section === "verification" && (
+        <div className="bg-white rounded-[var(--radius-card)] shadow-card p-5 space-y-4 max-w-md">
+          {verificationStatus === "VERIFIED" ? (
+            <p className="text-sm text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] rounded-lg px-3 py-2.5">
+              ✓ Your shop is Verified. Buyers see a Verified badge on your storefront.
+            </p>
+          ) : verificationStatus === "PENDING_REVIEW" ? (
+            <p className="text-sm text-[var(--color-gold-600)] bg-[var(--color-gold-50)] rounded-lg px-3 py-2.5">
+              Your documents are submitted and waiting for admin review.
+            </p>
+          ) : (
+            <>
+              <p className="text-xs text-[var(--color-ink-500)]">
+                Upload a trade license OR an NID (national ID) photo — at
+                least one is required. You can upload both for a stronger
+                review. Once approved, your shop shows a Verified badge so
+                buyers know exactly who they're buying from.
+              </p>
+              {org.verificationStatus === "REJECTED" && org.verificationNote && (
+                <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
+                  Previous submission was rejected: {org.verificationNote}
+                </p>
+              )}
+              <ImageUploadField
+                value={tradeLicenseUrl}
+                onChange={(url) => setTradeLicenseUrl(url)}
+                label="Trade license photo"
+              />
+              <ImageUploadField
+                value={nidUrl}
+                onChange={(url) => setNidUrl(url)}
+                label="NID photo"
+              />
+              {verificationError && (
+                <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
+                  {verificationError}
+                </p>
+              )}
+              {verificationSubmitted && (
+                <p className="text-xs text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] rounded-lg px-3 py-2">
+                  Submitted for review.
+                </p>
+              )}
+              <button
+                onClick={submitVerification}
+                disabled={submittingVerification || (!tradeLicenseUrl && !nidUrl)}
+                className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-5 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] disabled:opacity-50"
+              >
+                {submittingVerification ? "Submitting..." : "Submit for verification"}
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

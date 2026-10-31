@@ -24,6 +24,8 @@ export interface User {
   createdAt?: string;
 }
 
+export type VerificationStatus = "UNVERIFIED" | "PENDING_REVIEW" | "VERIFIED" | "REJECTED";
+
 export interface Organization {
   id: string;
   ownerUserId: string;
@@ -41,6 +43,11 @@ export interface Organization {
   skodePayEnabled?: boolean;
   latitude?: string | null;
   longitude?: string | null;
+  verificationStatus?: VerificationStatus;
+  tradeLicenseUrl?: string | null;
+  nidUrl?: string | null;
+  verificationNote?: string | null;
+  verifiedAt?: string | null;
 }
 
 export interface Category {

@@ -16,9 +16,21 @@ interface AdminStats {
   activeProducts: number;
   totalOrders: number;
   pendingPaymentVerifications: number;
+  unresolvedFraudFlags: number;
+  pendingVerifications: number;
 }
 
-type Tab = "pending" | "vendors" | "catalog" | "categories" | "orders" | "riders";
+interface FraudFlag {
+  id: string;
+  orderId: string;
+  reason: string;
+  severity: "LOW" | "MEDIUM" | "HIGH";
+  createdAt: string;
+  resolved: boolean;
+  order: Order & { buyer?: { fullName: string; phone: string; createdAt: string } };
+}
+
+type Tab = "pending" | "vendors" | "catalog" | "categories" | "orders" | "riders" | "fraud" | "verification";
 
 const inputClass =
   "border border-[var(--color-border)] rounded-[10px] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]";
@@ -40,6 +52,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("pending");
   const [newCategory, setNewCategory] = useState({ name: "", vertical: "MARKETPLACE" });
+  const [fraudFlags, setFraudFlags] = useState<FraudFlag[]>([]);
+  const [pendingVerifications, setPendingVerifications] = useState<Organization[]>([]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -62,8 +76,10 @@ export default function AdminPage() {
       api.get<Order[]>("/admin/orders", token),
       api.get<RiderProfile[]>("/riders/pending", token),
       api.get<RiderProfile[]>("/riders/approved", token),
+      api.get<FraudFlag[]>("/admin/fraud-flags", token),
+      api.get<Organization[]>("/organizations/pending-verifications", token),
     ])
-      .then(([p, v, s, c, cat, ord, pendRiders, apprRiders]) => {
+      .then(([p, v, s, c, cat, ord, pendRiders, apprRiders, flags, pendVerif]) => {
         setPending(p);
         setAllVendors(v);
         setStats(s);
@@ -72,6 +88,8 @@ export default function AdminPage() {
         setOrders(ord);
         setPendingRiders(pendRiders);
         setApprovedRiders(apprRiders);
+        setFraudFlags(flags);
+        setPendingVerifications(pendVerif);
       })
       .finally(() => setLoading(false));
   }
@@ -97,6 +115,25 @@ export default function AdminPage() {
   async function reject(id: string) {
     if (!token) return;
     await api.patch(`/organizations/${id}/reject`, {}, token);
+    loadAll();
+  }
+
+  async function resolveFraudFlag(id: string, note?: string) {
+    if (!token) return;
+    await api.patch(`/admin/fraud-flags/${id}/resolve`, { note }, token);
+    loadAll();
+  }
+
+  async function verifyOrg(id: string) {
+    if (!token) return;
+    await api.patch(`/organizations/${id}/verify`, {}, token);
+    loadAll();
+  }
+
+  async function rejectVerification(id: string) {
+    if (!token) return;
+    const note = window.prompt("Reason for rejecting this verification? (shown to the vendor)") ?? undefined;
+    await api.patch(`/organizations/${id}/reject-verification`, { note }, token);
     loadAll();
   }
 
@@ -153,6 +190,16 @@ export default function AdminPage() {
               value={stats.pendingPaymentVerifications}
               highlight={stats.pendingPaymentVerifications > 0}
             />
+            <StatCard
+              label="Fraud flags"
+              value={stats.unresolvedFraudFlags}
+              highlight={stats.unresolvedFraudFlags > 0}
+            />
+            <StatCard
+              label="Verifications to review"
+              value={stats.pendingVerifications}
+              highlight={stats.pendingVerifications > 0}
+            />
           </div>
         )}
 
@@ -163,6 +210,8 @@ export default function AdminPage() {
           <TabButton active={tab === "orders"} onClick={() => setTab("orders")} label={`Orders (${orders.length})`} />
           <TabButton active={tab === "categories"} onClick={() => setTab("categories")} label={`Categories (${categories.length})`} />
           <TabButton active={tab === "riders"} onClick={() => setTab("riders")} label={`Riders (${pendingRiders.length} pending)`} />
+          <TabButton active={tab === "fraud"} onClick={() => setTab("fraud")} label={`Fraud review (${fraudFlags.length})`} />
+          <TabButton active={tab === "verification"} onClick={() => setTab("verification")} label={`Verification (${pendingVerifications.length})`} />
         </div>
 
         {tab === "pending" && (
@@ -490,6 +539,111 @@ export default function AdminPage() {
                 </p>
               )}
             </div>
+          </div>
+        )}
+
+        {tab === "fraud" && (
+          <div className="space-y-3">
+            <p className="text-sm text-[var(--color-ink-500)] mb-2">
+              Automatically flagged orders. These are a review queue only —
+              nothing here was blocked or held, every order proceeded
+              normally. Resolve a flag once you've looked into it.
+            </p>
+            {fraudFlags.length === 0 && (
+              <p className="text-[var(--color-ink-500)]">No unresolved fraud flags right now.</p>
+            )}
+            {fraudFlags.map((f) => {
+              const total = f.order?.items?.reduce((s, it) => s + Number(it.price) * it.quantity, 0) ?? 0;
+              const severityStyle =
+                f.severity === "HIGH"
+                  ? "bg-red-50 text-red-700"
+                  : f.severity === "MEDIUM"
+                    ? "bg-[var(--color-gold-50)] text-[var(--color-gold-600)]"
+                    : "bg-[var(--color-cream-100)] text-[var(--color-ink-700)]";
+              return (
+                <div key={f.id} className="bg-white rounded-[var(--radius-card)] shadow-card p-4">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${severityStyle}`}>
+                        {f.severity}
+                      </span>
+                      <p className="text-sm text-[var(--color-ink-900)] mt-1.5">{f.reason}</p>
+                      <p className="text-xs text-[var(--color-ink-500)] mt-1">
+                        {f.order?.buyer?.fullName ?? "Buyer"} ({f.order?.buyer?.phone}) ·{" "}
+                        {f.order?.organization?.name ?? "Vendor"} · ৳{total} ·{" "}
+                        {f.order?.paymentMethod?.replace(/_/g, " ")}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => resolveFraudFlag(f.id, window.prompt("Resolution note (optional)") ?? undefined)}
+                      className="bg-[var(--color-emerald-700)] text-white px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors shrink-0"
+                    >
+                      Mark resolved
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {tab === "verification" && (
+          <div className="space-y-3">
+            <p className="text-sm text-[var(--color-ink-500)] mb-2">
+              Vendors who submitted a trade license and/or NID for review.
+              Approving adds a public Verified badge to their storefront.
+            </p>
+            {pendingVerifications.length === 0 && (
+              <p className="text-[var(--color-ink-500)]">No verification requests waiting for review.</p>
+            )}
+            {pendingVerifications.map((org: any) => (
+              <div key={org.id} className="bg-white rounded-[var(--radius-card)] shadow-card p-4">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="font-semibold text-[var(--color-ink-900)]">{org.name}</p>
+                    <p className="text-sm text-[var(--color-ink-500)]">
+                      {org.vertical} · {org.owner?.fullName} · {org.owner?.phone}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => verifyOrg(org.id)}
+                      className="bg-[var(--color-emerald-700)] text-white px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors"
+                    >
+                      Approve Verified
+                    </button>
+                    <button
+                      onClick={() => rejectVerification(org.id)}
+                      className="bg-red-50 text-red-700 px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-red-100 transition-colors"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-3 flex-wrap">
+                  {org.tradeLicenseUrl && (
+                    <a href={org.tradeLicenseUrl} target="_blank" rel="noopener noreferrer" className="block">
+                      <img
+                        src={org.tradeLicenseUrl}
+                        alt="Trade license"
+                        className="h-28 rounded-[10px] border border-[var(--color-border)] object-cover"
+                      />
+                      <span className="text-xs text-[var(--color-ink-500)] block mt-1">Trade license</span>
+                    </a>
+                  )}
+                  {org.nidUrl && (
+                    <a href={org.nidUrl} target="_blank" rel="noopener noreferrer" className="block">
+                      <img
+                        src={org.nidUrl}
+                        alt="NID"
+                        className="h-28 rounded-[10px] border border-[var(--color-border)] object-cover"
+                      />
+                      <span className="text-xs text-[var(--color-ink-500)] block mt-1">NID</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

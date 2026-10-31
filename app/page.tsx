@@ -322,8 +322,16 @@ function ShopInfoModal({ org, onClose }: { org: Organization; onClose: () => voi
         className="bg-white rounded-[var(--radius-card)] shadow-elevated max-w-sm w-full p-6 max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="font-display font-semibold text-lg text-[var(--color-ink-900)] mb-1">
+        <h3 className="font-display font-semibold text-lg text-[var(--color-ink-900)] mb-1 flex items-center gap-1.5">
           {org.name}
+          {org.verificationStatus === "VERIFIED" && (
+            <span
+              title="This shop has submitted a verified trade license or NID"
+              className="inline-flex items-center gap-0.5 text-xs font-medium text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] px-2 py-0.5 rounded-full"
+            >
+              ✓ Verified
+            </span>
+          )}
         </h3>
         <p className="text-sm text-[var(--color-ink-500)] mb-4">
           {org.area}
