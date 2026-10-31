@@ -26,6 +26,7 @@ export default function OrdersPage() {
   const { token, loading: authLoading } = useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [gifts, setGifts] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [rated, setRated] = useState<Record<string, boolean>>({});
 
@@ -35,9 +36,14 @@ export default function OrdersPage() {
       router.push("/login");
       return;
     }
-    api
-      .get<Order[]>("/orders/mine", token)
-      .then(setOrders)
+    Promise.all([
+      api.get<Order[]>("/orders/mine", token),
+      api.get<Order[]>("/orders/gifts-received", token),
+    ])
+      .then(([mine, received]) => {
+        setOrders(mine);
+        setGifts(received);
+      })
       .finally(() => setLoading(false));
   }, [token, authLoading, router]);
 
@@ -53,6 +59,46 @@ export default function OrdersPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-5 py-10">
+      {gifts.length > 0 && (
+        <div className="mb-8">
+          <h2 className="font-display text-xl font-semibold text-[var(--color-ink-900)] mb-1">
+            🎁 Gifts for you
+          </h2>
+          <p className="text-xs text-[var(--color-ink-500)] mb-4">
+            Someone sent these your way.
+          </p>
+          <div className="space-y-3">
+            {gifts.map((g) => (
+              <div
+                key={g.id}
+                className="bg-[var(--color-gold-50)] border border-[var(--color-gold-400)]/30 rounded-[var(--radius-card)] p-4"
+              >
+                <p className="text-sm font-medium text-[var(--color-ink-900)]">
+                  From {g.buyer ? g.buyer.fullName : "A Secret Admirer"} · {g.organization?.name ?? "a shop"}
+                </p>
+                {g.giftMessage && (
+                  <p className="text-sm text-[var(--color-ink-700)] italic mt-1">&ldquo;{g.giftMessage}&rdquo;</p>
+                )}
+                <div className="text-sm text-[var(--color-ink-700)] mt-2">
+                  {g.items.map((item) => (
+                    <div key={item.id} className="flex justify-between">
+                      <span>{item.product?.name ?? "Item"} × {item.quantity}</span>
+                    </div>
+                  ))}
+                </div>
+                <span
+                  className={`inline-block mt-2 text-xs px-2 py-1 rounded-full font-medium ${
+                    STATUS_COLORS[g.status] ?? "bg-neutral-100"
+                  }`}
+                >
+                  {g.status.replace(/_/g, " ")}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <h1 className="font-display text-2xl font-semibold text-[var(--color-ink-900)] mb-6">My Orders</h1>
       {orders.length === 0 && (
         <p className="text-[var(--color-ink-500)]">You haven't placed any orders yet.</p>
@@ -71,6 +117,11 @@ export default function OrdersPage() {
                 <p className="text-xs text-[var(--color-ink-300)]">
                   {new Date(order.createdAt).toLocaleString()}
                 </p>
+                {order.isGift && (
+                  <p className="text-xs text-[var(--color-gold-600)] font-medium mt-0.5">
+                    🎁 Sent as a gift to {order.recipient?.fullName ?? "someone"}
+                  </p>
+                )}
               </div>
               <span
                 className={`text-xs px-2 py-1 rounded-full font-medium ${

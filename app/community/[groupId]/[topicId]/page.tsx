@@ -22,6 +22,7 @@ function TopicPage() {
   const socketRef = useChatSocket(token);
   const [posts, setPosts] = useState<GroupPost[]>([]);
   const [draft, setDraft] = useState("");
+  const [anonPost, setAnonPost] = useState(false);
   const [loading, setLoading] = useState(true);
   const [messagedIds, setMessagedIds] = useState<Set<string>>(new Set());
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -56,9 +57,11 @@ function TopicPage() {
   async function handleSend() {
     if (!draft.trim() || !token) return;
     const body = draft.trim();
+    const isAnonymous = anonPost;
     setDraft("");
+    setAnonPost(false);
     try {
-      const post = await api.post<GroupPost>(`/groups/topics/${topicId}/posts`, { body }, token);
+      const post = await api.post<GroupPost>(`/groups/topics/${topicId}/posts`, { body, isAnonymous }, token);
       setPosts((prev) => [...prev, post]);
     } catch {
       setDraft(body);
@@ -90,14 +93,14 @@ function TopicPage() {
             <div key={p.id} className="bg-white rounded-[var(--radius-sm)] shadow-card px-3.5 py-2.5">
               <div className="flex items-baseline justify-between gap-2 mb-0.5">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-sm font-medium text-[var(--color-ink-900)]">
-                    {p.author?.fullName ?? "Someone"}
+                  <span className={`text-sm font-medium ${p.isAnonymous ? "italic text-[var(--color-ink-500)]" : "text-[var(--color-ink-900)]"}`}>
+                    {p.isAnonymous ? "Anonymous" : p.author?.fullName ?? "Someone"}
                   </span>
-                  {p.authorId === user?.id && (
+                  {!p.isAnonymous && p.authorId === user?.id && (
                     <span className="text-[10px] text-[var(--color-emerald-700)]">you</span>
                   )}
                 </div>
-                {p.authorId !== user?.id && (
+                {!p.isAnonymous && p.authorId !== user?.id && (
                   <button
                     onClick={() => handleMessage(p.authorId)}
                     className="text-xs text-[var(--color-emerald-700)] font-medium shrink-0"
@@ -112,21 +115,32 @@ function TopicPage() {
         )}
         <div ref={bottomRef} />
       </div>
-      <div className="flex gap-2 pt-3 border-t border-[var(--color-border)] mt-2">
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder="Write something…"
-          className="flex-1 text-sm rounded-[var(--radius-pill)] border border-[var(--color-border)] px-4 py-2 outline-none focus:border-[var(--color-emerald-500)]"
-        />
-        <button
-          onClick={handleSend}
-          disabled={!draft.trim()}
-          className="bg-[var(--color-emerald-600)] text-white text-sm font-medium rounded-[var(--radius-pill)] px-5 py-2 disabled:opacity-40"
-        >
-          Post
-        </button>
+      <div className="pt-3 border-t border-[var(--color-border)] mt-2">
+        <div className="flex gap-2">
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            placeholder="Write something…"
+            className="flex-1 text-sm rounded-[var(--radius-pill)] border border-[var(--color-border)] px-4 py-2 outline-none focus:border-[var(--color-emerald-500)]"
+          />
+          <button
+            onClick={handleSend}
+            disabled={!draft.trim()}
+            className="bg-[var(--color-emerald-600)] text-white text-sm font-medium rounded-[var(--radius-pill)] px-5 py-2 disabled:opacity-40"
+          >
+            Post
+          </button>
+        </div>
+        <label className="flex items-center gap-1.5 mt-1.5 text-xs text-[var(--color-ink-500)] cursor-pointer">
+          <input
+            type="checkbox"
+            checked={anonPost}
+            onChange={(e) => setAnonPost(e.target.checked)}
+            className="w-3.5 h-3.5"
+          />
+          Post anonymously
+        </label>
       </div>
     </div>
   );

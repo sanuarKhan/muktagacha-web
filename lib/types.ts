@@ -113,6 +113,12 @@ export interface Order {
   deliveredAt?: string | null;
   deliveryLatitude?: string | null;
   deliveryLongitude?: string | null;
+  deliveryAddressText?: string | null;
+  isGift?: boolean;
+  recipientId?: string | null;
+  recipient?: User | null;
+  giftMessage?: string | null;
+  giftSenderAnonymous?: boolean;
   createdAt: string;
   items: OrderItem[];
   organization?: Organization;
@@ -202,6 +208,7 @@ export interface ShopQuestionReply {
   author?: ChatUser;
   body: string;
   score: number;
+  isAnonymous?: boolean;
   myVote?: "UP" | "DOWN" | null;
   createdAt: string;
 }
@@ -212,6 +219,7 @@ export interface ShopQuestion {
   askerId: string;
   asker?: ChatUser;
   body: string;
+  isAnonymous?: boolean;
   replies: ShopQuestionReply[];
   createdAt: string;
 }
@@ -247,5 +255,6 @@ export interface GroupPost {
   authorId: string;
   author?: ChatUser;
   body: string;
+  isAnonymous?: boolean;
   createdAt: string;
 }

@@ -397,7 +397,9 @@ function ShopQABoard({ organizationId }: { organizationId: string }) {
   const { user, token } = useAuth();
   const [questions, setQuestions] = useState<ShopQuestion[]>([]);
   const [draft, setDraft] = useState("");
+  const [anonAsk, setAnonAsk] = useState(false);
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [anonReply, setAnonReply] = useState<Record<string, boolean>>({});
 
   function load() {
     api.get<ShopQuestion[]>(`/chat/shops/${organizationId}/questions`).then(setQuestions).catch(() => {});
@@ -411,16 +413,20 @@ function ShopQABoard({ organizationId }: { organizationId: string }) {
   async function handleAsk() {
     if (!draft.trim() || !token) return;
     const body = draft.trim();
+    const isAnonymous = anonAsk;
     setDraft("");
-    await api.post(`/chat/shops/${organizationId}/questions`, { body }, token);
+    setAnonAsk(false);
+    await api.post(`/chat/shops/${organizationId}/questions`, { body, isAnonymous }, token);
     load();
   }
 
   async function handleReply(questionId: string) {
     const body = (replyDrafts[questionId] || "").trim();
     if (!body || !token) return;
+    const isAnonymous = !!anonReply[questionId];
     setReplyDrafts((prev) => ({ ...prev, [questionId]: "" }));
-    await api.post(`/chat/questions/${questionId}/replies`, { body }, token);
+    setAnonReply((prev) => ({ ...prev, [questionId]: false }));
+    await api.post(`/chat/questions/${questionId}/replies`, { body, isAnonymous }, token);
     load();
   }
 
@@ -447,21 +453,32 @@ function ShopQABoard({ organizationId }: { organizationId: string }) {
       </p>
 
       {user && token && (
-        <div className="flex gap-2 mb-3">
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAsk()}
-            placeholder="Ask a question…"
-            className="flex-1 text-sm rounded-[var(--radius-pill)] border border-[var(--color-border)] px-3 py-1.5 outline-none focus:border-[var(--color-emerald-500)]"
-          />
-          <button
-            onClick={handleAsk}
-            disabled={!draft.trim()}
-            className="text-sm font-medium text-[var(--color-emerald-700)] disabled:opacity-40 shrink-0"
-          >
-            Ask
-          </button>
+        <div className="mb-3">
+          <div className="flex gap-2">
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAsk()}
+              placeholder="Ask a question…"
+              className="flex-1 text-sm rounded-[var(--radius-pill)] border border-[var(--color-border)] px-3 py-1.5 outline-none focus:border-[var(--color-emerald-500)]"
+            />
+            <button
+              onClick={handleAsk}
+              disabled={!draft.trim()}
+              className="text-sm font-medium text-[var(--color-emerald-700)] disabled:opacity-40 shrink-0"
+            >
+              Ask
+            </button>
+          </div>
+          <label className="flex items-center gap-1.5 mt-1.5 text-xs text-[var(--color-ink-500)] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={anonAsk}
+              onChange={(e) => setAnonAsk(e.target.checked)}
+              className="w-3.5 h-3.5"
+            />
+            Post anonymously
+          </label>
         </div>
       )}
 
@@ -471,7 +488,9 @@ function ShopQABoard({ organizationId }: { organizationId: string }) {
         <div className="space-y-3 max-h-64 overflow-y-auto">
           {questions.map((q) => (
             <div key={q.id} className="bg-[var(--color-cream-100)] rounded-[var(--radius-sm)] p-2.5">
-              <p className="text-xs font-medium text-[var(--color-ink-900)]">{q.asker?.fullName ?? "Someone"}</p>
+              <p className="text-xs font-medium text-[var(--color-ink-900)]">
+                {q.isAnonymous ? <span className="italic text-[var(--color-ink-500)]">Anonymous</span> : q.asker?.fullName ?? "Someone"}
+              </p>
               <p className="text-sm text-[var(--color-ink-700)] mb-1.5">{q.body}</p>
               {q.replies.map((r) => (
                 <div key={r.id} className="ml-1 mt-1.5 flex gap-2 items-start">
@@ -493,28 +512,39 @@ function ShopQABoard({ organizationId }: { organizationId: string }) {
                     </button>
                   </div>
                   <div className="text-sm">
-                    <span className="font-medium text-[var(--color-emerald-700)]">
-                      {r.author?.fullName ?? "Reply"}:
+                    <span className={`font-medium ${r.isAnonymous ? "italic text-[var(--color-ink-500)]" : "text-[var(--color-emerald-700)]"}`}>
+                      {r.isAnonymous ? "Anonymous" : r.author?.fullName ?? "Reply"}:
                     </span>{" "}
                     <span className="text-[var(--color-ink-700)]">{r.body}</span>
                   </div>
                 </div>
               ))}
               {user && token && (
-                <div className="flex gap-2 mt-1.5">
-                  <input
-                    value={replyDrafts[q.id] || ""}
-                    onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [q.id]: e.target.value }))}
-                    onKeyDown={(e) => e.key === "Enter" && handleReply(q.id)}
-                    placeholder="Reply…"
-                    className="flex-1 text-xs rounded-[var(--radius-pill)] border border-[var(--color-border)] px-2.5 py-1 outline-none"
-                  />
-                  <button
-                    onClick={() => handleReply(q.id)}
-                    className="text-xs font-medium text-[var(--color-emerald-700)] shrink-0"
-                  >
-                    Reply
-                  </button>
+                <div className="mt-1.5">
+                  <div className="flex gap-2">
+                    <input
+                      value={replyDrafts[q.id] || ""}
+                      onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                      onKeyDown={(e) => e.key === "Enter" && handleReply(q.id)}
+                      placeholder="Reply…"
+                      className="flex-1 text-xs rounded-[var(--radius-pill)] border border-[var(--color-border)] px-2.5 py-1 outline-none"
+                    />
+                    <button
+                      onClick={() => handleReply(q.id)}
+                      className="text-xs font-medium text-[var(--color-emerald-700)] shrink-0"
+                    >
+                      Reply
+                    </button>
+                  </div>
+                  <label className="flex items-center gap-1.5 mt-1 text-[10px] text-[var(--color-ink-500)] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!anonReply[q.id]}
+                      onChange={(e) => setAnonReply((prev) => ({ ...prev, [q.id]: e.target.checked }))}
+                      className="w-3 h-3"
+                    />
+                    Reply anonymously
+                  </label>
                 </div>
               )}
             </div>

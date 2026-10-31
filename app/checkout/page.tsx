@@ -32,6 +32,17 @@ export default function CheckoutPage() {
   const [showMap, setShowMap] = useState(false);
   const [locating, setLocating] = useState(false);
 
+  // Gift order state - sending this whole cart to someone else instead of
+  // yourself (e.g. a surprise gift for a partner/friend).
+  const [isGift, setIsGift] = useState(false);
+  const [giftQuery, setGiftQuery] = useState("");
+  const [giftResults, setGiftResults] = useState<{ id: string; fullName: string; phone: string }[]>([]);
+  const [giftRecipient, setGiftRecipient] = useState<{ id: string; fullName: string; phone: string } | null>(null);
+  const [giftSearching, setGiftSearching] = useState(false);
+  const [giftMessage, setGiftMessage] = useState("");
+  const [giftAnonymous, setGiftAnonymous] = useState(false);
+  const [giftAddress, setGiftAddress] = useState("");
+
   const grouped = linesByOrganization();
   const total = lines.reduce(
     (sum, l) =>
@@ -76,6 +87,28 @@ export default function CheckoutPage() {
     );
   }
 
+  // Debounced recipient search for the gift flow - searches by name or
+  // phone (whichever the sender typed), min 2 chars to avoid a flood of
+  // results on every keystroke.
+  useEffect(() => {
+    if (!isGift || !token || giftQuery.trim().length < 2) {
+      setGiftResults([]);
+      return;
+    }
+    const handle = setTimeout(() => {
+      setGiftSearching(true);
+      api
+        .get<{ id: string; fullName: string; phone: string }[]>(
+          `/users/search?q=${encodeURIComponent(giftQuery.trim())}`,
+          token,
+        )
+        .then(setGiftResults)
+        .catch(() => setGiftResults([]))
+        .finally(() => setGiftSearching(false));
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [giftQuery, isGift, token]);
+
   async function placeOrders() {
     if (!user || !token) {
       router.push("/login");
@@ -87,6 +120,16 @@ export default function CheckoutPage() {
         setError(
           "Please enter the transaction ID for each vendor after paying via bKash/Nagad.",
         );
+        return;
+      }
+    }
+    if (isGift) {
+      if (!giftRecipient) {
+        setError("Choose who this gift is for.");
+        return;
+      }
+      if (!giftAddress.trim()) {
+        setError("Enter the recipient's delivery address for this gift.");
         return;
       }
     }
@@ -102,8 +145,13 @@ export default function CheckoutPage() {
           {
             organizationId,
             paymentMethod,
-            deliveryLatitude: deliveryPin?.lat,
-            deliveryLongitude: deliveryPin?.lng,
+            deliveryLatitude: isGift ? undefined : deliveryPin?.lat,
+            deliveryLongitude: isGift ? undefined : deliveryPin?.lng,
+            deliveryAddressText: isGift ? giftAddress.trim() : undefined,
+            isGift,
+            recipientId: isGift ? giftRecipient?.id : undefined,
+            giftMessage: isGift ? giftMessage.trim() || undefined : undefined,
+            giftSenderAnonymous: isGift ? giftAnonymous : undefined,
             items: groupLines.map((l) => ({
               productId: l.product.id,
               variantId: l.variant?.id,
@@ -230,6 +278,115 @@ export default function CheckoutPage() {
         <span>৳{total}</span>
       </div>
 
+      {/* Send as a gift - buyer pays, a different person receives it */}
+      <div className="bg-white rounded-[var(--radius-card)] shadow-card p-5 mb-6">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isGift}
+            onChange={(e) => {
+              setIsGift(e.target.checked);
+              if (!e.target.checked) {
+                setGiftRecipient(null);
+                setGiftQuery("");
+                setGiftMessage("");
+                setGiftAnonymous(false);
+                setGiftAddress("");
+              }
+            }}
+            className="w-4 h-4"
+          />
+          <span className="text-sm font-medium text-[var(--color-ink-900)]">
+            🎁 Send this as a gift to someone else
+          </span>
+        </label>
+
+        {isGift && (
+          <div className="mt-4 space-y-3">
+            {giftRecipient ? (
+              <div className="flex items-center justify-between bg-[var(--color-emerald-50)] rounded-[var(--radius-sm)] px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium text-[var(--color-ink-900)]">{giftRecipient.fullName}</p>
+                  <p className="text-xs text-[var(--color-ink-500)]">{giftRecipient.phone}</p>
+                </div>
+                <button
+                  onClick={() => setGiftRecipient(null)}
+                  className="text-xs text-[var(--color-ink-500)] hover:text-red-600"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-ink-700)] mb-1">
+                  Who is this gift for?
+                </label>
+                <input
+                  value={giftQuery}
+                  onChange={(e) => setGiftQuery(e.target.value)}
+                  placeholder="Search by name or phone number…"
+                  className="w-full border border-[var(--color-border)] rounded-[10px] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]"
+                />
+                {giftSearching && <p className="text-xs text-[var(--color-ink-500)] mt-1">Searching…</p>}
+                {giftResults.length > 0 && (
+                  <div className="mt-2 border border-[var(--color-border)] rounded-[10px] overflow-hidden divide-y divide-[var(--color-border)]">
+                    {giftResults.map((u) => (
+                      <button
+                        key={u.id}
+                        onClick={() => {
+                          setGiftRecipient(u);
+                          setGiftResults([]);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-[var(--color-cream-100)] text-sm"
+                      >
+                        <span className="font-medium text-[var(--color-ink-900)]">{u.fullName}</span>{" "}
+                        <span className="text-[var(--color-ink-500)]">{u.phone}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-ink-700)] mb-1">
+                Gift message (optional)
+              </label>
+              <input
+                value={giftMessage}
+                onChange={(e) => setGiftMessage(e.target.value)}
+                placeholder="e.g. Happy birthday! 🎉"
+                className="w-full border border-[var(--color-border)] rounded-[10px] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-ink-700)] mb-1">
+                Recipient's delivery address
+              </label>
+              <input
+                value={giftAddress}
+                onChange={(e) => setGiftAddress(e.target.value)}
+                placeholder="Their full address so the rider can deliver it"
+                className="w-full border border-[var(--color-border)] rounded-[10px] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]"
+              />
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={giftAnonymous}
+                onChange={(e) => setGiftAnonymous(e.target.checked)}
+                className="w-4 h-4"
+              />
+              <span className="text-sm text-[var(--color-ink-700)]">
+                Send anonymously (shown as "A Secret Admirer")
+              </span>
+            </label>
+          </div>
+        )}
+      </div>
+
       <div className="mb-6">
         <label className="block text-sm font-medium text-[var(--color-ink-700)] mb-2">
           Payment method
@@ -261,49 +418,51 @@ export default function CheckoutPage() {
         )}
       </div>
 
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-[var(--color-ink-700)] mb-2">
-          Delivery location (optional)
-        </label>
-        <p className="text-xs text-[var(--color-ink-500)] mb-2">
-          Pin your exact location so the delivery rider can find you easily.
-          If you skip this, we'll use your area/ward address instead.
-        </p>
-        {!showMap && (
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={useMyLocation}
-              disabled={locating}
-              className="text-sm bg-white border border-[var(--color-border)] rounded-[var(--radius-pill)] px-4 py-2 hover:bg-[var(--color-emerald-50)] transition-colors disabled:opacity-50"
-            >
-              {locating ? "Finding you..." : "📍 Use my current location"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowMap(true)}
-              className="text-sm text-[var(--color-ink-500)] px-3 hover:text-[var(--color-ink-900)]"
-            >
-              Or pin on map
-            </button>
-          </div>
-        )}
-        {showMap && (
-          <div>
-            <LocationPicker
-              lat={deliveryPin?.lat}
-              lng={deliveryPin?.lng}
-              onChange={(lat, lng) => setDeliveryPin({ lat, lng })}
-              height={220}
-            />
-            {deliveryPin && (
-              <p className="text-xs text-[var(--color-ink-500)] mt-1.5">
-                Pinned at {deliveryPin.lat.toFixed(5)}, {deliveryPin.lng.toFixed(5)}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
+      {!isGift && (
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-[var(--color-ink-700)] mb-2">
+            Delivery location (optional)
+          </label>
+          <p className="text-xs text-[var(--color-ink-500)] mb-2">
+            Pin your exact location so the delivery rider can find you easily.
+            If you skip this, we'll use your area/ward address instead.
+          </p>
+          {!showMap && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={useMyLocation}
+                disabled={locating}
+                className="text-sm bg-white border border-[var(--color-border)] rounded-[var(--radius-pill)] px-4 py-2 hover:bg-[var(--color-emerald-50)] transition-colors disabled:opacity-50"
+              >
+                {locating ? "Finding you..." : "📍 Use my current location"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowMap(true)}
+                className="text-sm text-[var(--color-ink-500)] px-3 hover:text-[var(--color-ink-900)]"
+              >
+                Or pin on map
+              </button>
+            </div>
+          )}
+          {showMap && (
+            <div>
+              <LocationPicker
+                lat={deliveryPin?.lat}
+                lng={deliveryPin?.lng}
+                onChange={(lat, lng) => setDeliveryPin({ lat, lng })}
+                height={220}
+              />
+              {deliveryPin && (
+                <p className="text-xs text-[var(--color-ink-500)] mt-1.5">
+                  Pinned at {deliveryPin.lat.toFixed(5)}, {deliveryPin.lng.toFixed(5)}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {error && <p className="text-sm text-red-600 mb-4 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
