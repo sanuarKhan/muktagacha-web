@@ -334,7 +334,7 @@ function ShopInfoModal({ org, onClose }: { org: Organization; onClose: () => voi
           <div className="mb-4">
             <LocationDisplay lat={lat} lng={lng} label={org.name} height={200} />
             <a
-              href={`https://www.openstreetmap.org/directions?from=&to=${lat}%2C${lng}`}
+              href={`https://www.google.com/maps/dir/?api=1&destination=${lat}%2C${lng}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-sm text-[var(--color-emerald-700)] font-medium hover:underline mt-2"

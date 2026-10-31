@@ -237,7 +237,7 @@ function RiderDashboard({ profile, token }: { profile: RiderProfile; token: stri
                 </p>
                 {o.deliveryLatitude && o.deliveryLongitude && (
                   <a
-                    href={`https://www.openstreetmap.org/directions?from=&to=${o.deliveryLatitude}%2C${o.deliveryLongitude}`}
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${o.deliveryLatitude}%2C${o.deliveryLongitude}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-xs text-[var(--color-emerald-700)] font-medium hover:underline mt-1.5"
