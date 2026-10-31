@@ -61,6 +61,12 @@ export default function BookingsPage() {
     setRated((prev) => ({ ...prev, [requestId]: true }));
   }
 
+  async function confirmCompletion(requestId: string) {
+    if (!token) return;
+    const updated = await api.post<ServiceRequest>(`/service-requests/${requestId}/confirm-completion`, {}, token);
+    setBookings((prev) => prev.map((b) => (b.id === requestId ? updated : b)));
+  }
+
   if (authLoading || loading) {
     return <div className="max-w-2xl mx-auto px-4 py-12">Loading...</div>;
   }
@@ -164,6 +170,31 @@ export default function BookingsPage() {
                 {b.paymentVerification && b.paymentMethod !== "CASH_ON_DELIVERY" && (
                   <> · {b.paymentVerification.replace(/_/g, " ")}</>
                 )}
+              </p>
+            )}
+
+            {b.escrowStatus === "HELD" && b.status === "COMPLETED" && !b.buyerConfirmedAt && (
+              <div className="mt-2 pt-2 border-t border-[var(--color-border)]">
+                <p className="text-xs text-[var(--color-ink-700)] mb-2">
+                  You paid from your wallet and the money is being held safely
+                  until you confirm this job was done.
+                </p>
+                <button
+                  onClick={() => confirmCompletion(b.id)}
+                  className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-4 py-1.5 text-xs font-medium hover:bg-[var(--color-emerald-900)]"
+                >
+                  Confirm the job was done
+                </button>
+              </div>
+            )}
+            {b.escrowStatus === "HELD" && b.buyerConfirmedAt && (
+              <p className="text-xs text-[var(--color-gold-600)] bg-[var(--color-gold-50)] rounded-lg px-3 py-2 mt-2">
+                You confirmed completion — the provider will be paid out shortly.
+              </p>
+            )}
+            {b.escrowStatus === "RELEASED" && (
+              <p className="text-xs text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] rounded-lg px-3 py-2 mt-2">
+                ✓ Payment released to the provider.
               </p>
             )}
 

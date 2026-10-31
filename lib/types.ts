@@ -122,6 +122,8 @@ export interface OrderItem {
 
 export type PrescriptionStatus = "NOT_REQUIRED" | "PENDING_UPLOAD" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
 
+export type EscrowStatus = "NOT_APPLICABLE" | "HELD" | "RELEASED" | "REFUNDED";
+
 export interface Order {
   id: string;
   buyerId: string;
@@ -152,6 +154,8 @@ export interface Order {
   organization?: Organization;
   buyer?: User;
   shopReview?: ShopReview | null;
+  escrowStatus?: EscrowStatus;
+  buyerConfirmedAt?: string | null;
 }
 
 export interface AuthResponse {
@@ -319,6 +323,8 @@ export interface ServiceRequest {
   createdAt: string;
   completedAt?: string | null;
   shopReview?: ShopReview | null;
+  escrowStatus?: EscrowStatus;
+  buyerConfirmedAt?: string | null;
 }
 
 export type WalletTopupStatus = "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED";

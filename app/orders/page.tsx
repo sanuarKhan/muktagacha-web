@@ -67,6 +67,12 @@ export default function OrdersPage() {
     setShopRated((prev) => ({ ...prev, [orderId]: true }));
   }
 
+  async function confirmDelivery(orderId: string) {
+    if (!token) return;
+    const updated = await api.post<Order>(`/orders/${orderId}/confirm-delivery`, {}, token);
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+  }
+
   if (authLoading || loading) {
     return <div className="max-w-2xl mx-auto px-4 py-12">Loading...</div>;
   }
@@ -193,6 +199,30 @@ export default function OrdersPage() {
             {order.requiresPrescription && order.prescriptionStatus === "APPROVED" && (
               <p className="text-xs text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] rounded-lg px-3 py-2 mt-2">
                 ✓ Prescription approved.
+              </p>
+            )}
+            {order.escrowStatus === "HELD" && order.status === "COMPLETED" && !order.buyerConfirmedAt && (
+              <div className="mt-2 pt-2 border-t border-[var(--color-border)]">
+                <p className="text-xs text-[var(--color-ink-700)] mb-2">
+                  You paid from your wallet and the money is being held safely
+                  until you confirm this order arrived as expected.
+                </p>
+                <button
+                  onClick={() => confirmDelivery(order.id)}
+                  className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-4 py-1.5 text-xs font-medium hover:bg-[var(--color-emerald-900)]"
+                >
+                  Confirm I received this order
+                </button>
+              </div>
+            )}
+            {order.escrowStatus === "HELD" && order.buyerConfirmedAt && (
+              <p className="text-xs text-[var(--color-gold-600)] bg-[var(--color-gold-50)] rounded-lg px-3 py-2 mt-2">
+                You confirmed receipt — the vendor will be paid out shortly.
+              </p>
+            )}
+            {order.escrowStatus === "RELEASED" && (
+              <p className="text-xs text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] rounded-lg px-3 py-2 mt-2">
+                ✓ Payment released to the vendor.
               </p>
             )}
             {order.status === "COMPLETED" && !shopRated[order.id] && !order.shopReview && (

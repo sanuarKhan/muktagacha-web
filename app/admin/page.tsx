@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
-import type { Organization, Product, Category, Order, RiderProfile, WalletTopup } from "@/lib/types";
+import type { Organization, Product, Category, Order, RiderProfile, WalletTopup, ServiceRequest } from "@/lib/types";
 
 interface AdminStats {
   totalUsers: number;
@@ -30,7 +30,7 @@ interface FraudFlag {
   order: Order & { buyer?: { fullName: string; phone: string; createdAt: string } };
 }
 
-type Tab = "pending" | "vendors" | "catalog" | "categories" | "orders" | "riders" | "fraud" | "verification" | "wallet";
+type Tab = "pending" | "vendors" | "catalog" | "categories" | "orders" | "riders" | "fraud" | "verification" | "wallet" | "escrow";
 
 const inputClass =
   "border border-[var(--color-border)] rounded-[10px] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]";
@@ -55,6 +55,8 @@ export default function AdminPage() {
   const [fraudFlags, setFraudFlags] = useState<FraudFlag[]>([]);
   const [pendingVerifications, setPendingVerifications] = useState<Organization[]>([]);
   const [pendingTopups, setPendingTopups] = useState<WalletTopup[]>([]);
+  const [escrowOrders, setEscrowOrders] = useState<Order[]>([]);
+  const [escrowServiceRequests, setEscrowServiceRequests] = useState<ServiceRequest[]>([]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -80,8 +82,9 @@ export default function AdminPage() {
       api.get<FraudFlag[]>("/admin/fraud-flags", token),
       api.get<Organization[]>("/organizations/pending-verifications", token),
       api.get<WalletTopup[]>("/wallet/topups/pending", token),
+      api.get<{ orders: Order[]; serviceRequests: ServiceRequest[] }>("/admin/escrow", token),
     ])
-      .then(([p, v, s, c, cat, ord, pendRiders, apprRiders, flags, pendVerif, pendTopups]) => {
+      .then(([p, v, s, c, cat, ord, pendRiders, apprRiders, flags, pendVerif, pendTopups, escrow]) => {
         setPending(p);
         setAllVendors(v);
         setStats(s);
@@ -93,6 +96,8 @@ export default function AdminPage() {
         setFraudFlags(flags);
         setPendingVerifications(pendVerif);
         setPendingTopups(pendTopups);
+        setEscrowOrders(escrow.orders);
+        setEscrowServiceRequests(escrow.serviceRequests);
       })
       .finally(() => setLoading(false));
   }
@@ -143,6 +148,20 @@ export default function AdminPage() {
   async function reviewTopup(id: string, decision: "VERIFIED" | "REJECTED") {
     if (!token) return;
     await api.patch(`/wallet/topups/${id}/review`, { decision }, token);
+    loadAll();
+  }
+
+  async function releaseOrderEscrow(id: string, force: boolean) {
+    if (!token) return;
+    if (force && !window.confirm("The buyer hasn't confirmed receipt yet. Force-release anyway?")) return;
+    await api.patch(`/orders/${id}/release-escrow`, { force }, token);
+    loadAll();
+  }
+
+  async function releaseBookingEscrow(id: string, force: boolean) {
+    if (!token) return;
+    if (force && !window.confirm("The buyer hasn't confirmed completion yet. Force-release anyway?")) return;
+    await api.patch(`/service-requests/${id}/release-escrow`, { force }, token);
     loadAll();
   }
 
@@ -222,6 +241,7 @@ export default function AdminPage() {
           <TabButton active={tab === "fraud"} onClick={() => setTab("fraud")} label={`Fraud review (${fraudFlags.length})`} />
           <TabButton active={tab === "verification"} onClick={() => setTab("verification")} label={`Verification (${pendingVerifications.length})`} />
           <TabButton active={tab === "wallet"} onClick={() => setTab("wallet")} label={`Wallet top-ups (${pendingTopups.length})`} />
+          <TabButton active={tab === "escrow"} onClick={() => setTab("escrow")} label={`Escrow (${escrowOrders.length + escrowServiceRequests.length})`} />
         </div>
 
         {tab === "pending" && (
@@ -690,6 +710,89 @@ export default function AdminPage() {
                   >
                     Reject
                   </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab === "escrow" && (
+          <div className="space-y-3">
+            <p className="text-sm text-[var(--color-ink-500)] mb-2">
+              Wallet-paid orders/bookings currently holding funds in escrow.
+              Release only after the buyer has confirmed (shown below), or
+              force-release for a genuinely unresponsive buyer — every
+              force-release is logged against your admin account.
+            </p>
+            {escrowOrders.length === 0 && escrowServiceRequests.length === 0 && (
+              <p className="text-[var(--color-ink-500)]">No funds currently held in escrow.</p>
+            )}
+            {escrowOrders.map((o: any) => (
+              <div key={o.id} className="bg-white rounded-[var(--radius-card)] shadow-card p-4 flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <p className="font-semibold text-[var(--color-ink-900)]">
+                    Order · {o.organization?.name} · ৳
+                    {o.items?.reduce((s: number, it: any) => s + Number(it.price) * it.quantity, 0).toFixed(2)}
+                  </p>
+                  <p className="text-sm text-[var(--color-ink-500)]">
+                    Buyer: {o.buyer?.fullName} · {o.buyer?.phone} ·{" "}
+                    {o.buyerConfirmedAt ? (
+                      <span className="text-[var(--color-emerald-700)]">Buyer confirmed ✓</span>
+                    ) : (
+                      <span className="text-[var(--color-gold-600)]">Awaiting buyer confirmation</span>
+                    )}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => releaseOrderEscrow(o.id, false)}
+                    disabled={!o.buyerConfirmedAt}
+                    className="bg-[var(--color-emerald-700)] text-white px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors disabled:opacity-40"
+                  >
+                    Release to vendor
+                  </button>
+                  {!o.buyerConfirmedAt && (
+                    <button
+                      onClick={() => releaseOrderEscrow(o.id, true)}
+                      className="bg-red-50 text-red-700 px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-red-100 transition-colors"
+                    >
+                      Force release
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {escrowServiceRequests.map((r: any) => (
+              <div key={r.id} className="bg-white rounded-[var(--radius-card)] shadow-card p-4 flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <p className="font-semibold text-[var(--color-ink-900)]">
+                    Booking · {r.organization?.name} · ৳{r.quotedPrice}
+                  </p>
+                  <p className="text-sm text-[var(--color-ink-500)]">
+                    Buyer: {r.buyer?.fullName} · {r.buyer?.phone} ·{" "}
+                    {r.buyerConfirmedAt ? (
+                      <span className="text-[var(--color-emerald-700)]">Buyer confirmed ✓</span>
+                    ) : (
+                      <span className="text-[var(--color-gold-600)]">Awaiting buyer confirmation</span>
+                    )}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => releaseBookingEscrow(r.id, false)}
+                    disabled={!r.buyerConfirmedAt}
+                    className="bg-[var(--color-emerald-700)] text-white px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors disabled:opacity-40"
+                  >
+                    Release to provider
+                  </button>
+                  {!r.buyerConfirmedAt && (
+                    <button
+                      onClick={() => releaseBookingEscrow(r.id, true)}
+                      className="bg-red-50 text-red-700 px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-red-100 transition-colors"
+                    >
+                      Force release
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
