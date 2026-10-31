@@ -3,6 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { CartProvider } from "@/lib/cart-context";
 import Navbar from "@/components/Navbar";
+import ChatWidget from "@/components/ChatWidget";
 
 export const metadata: Metadata = {
   title: "Muktagacha | Local Marketplace",
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <CartProvider>
             <Navbar />
             <main className="flex-1">{children}</main>
+            <ChatWidget />
           </CartProvider>
         </AuthProvider>
       </body>

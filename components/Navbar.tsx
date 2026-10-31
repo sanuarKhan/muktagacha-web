@@ -47,6 +47,12 @@ export default function Navbar() {
           >
             Browse
           </Link>
+          <Link
+            href="/community"
+            className="text-[var(--color-ink-700)] hover:text-[var(--color-emerald-700)] transition-colors"
+          >
+            Community
+          </Link>
 
           {!user && (
             <>
@@ -135,6 +141,13 @@ export default function Navbar() {
             className="py-2.5 text-[var(--color-ink-700)]"
           >
             Browse
+          </Link>
+          <Link
+            href="/community"
+            onClick={() => setMenuOpen(false)}
+            className="py-2.5 text-[var(--color-ink-700)]"
+          >
+            Community
           </Link>
           {!user && (
             <Link

@@ -165,3 +165,85 @@ export interface RiderProfile {
   createdAt: string;
   user?: User;
 }
+
+// ───────────────────────── Chat ─────────────────────────
+
+export interface ChatUser {
+  id: string;
+  fullName: string;
+  role: UserRole;
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  sender?: ChatUser;
+  body: string;
+  readAt?: string | null;
+  createdAt: string;
+}
+
+export interface Conversation {
+  id: string;
+  organizationId: string;
+  organization?: { id: string; name: string; logoUrl?: string | null };
+  buyerId: string;
+  buyer?: ChatUser;
+  messages?: Message[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShopQuestionReply {
+  id: string;
+  questionId: string;
+  authorId: string;
+  author?: ChatUser;
+  body: string;
+  createdAt: string;
+}
+
+export interface ShopQuestion {
+  id: string;
+  organizationId: string;
+  askerId: string;
+  asker?: ChatUser;
+  body: string;
+  replies: ShopQuestionReply[];
+  createdAt: string;
+}
+
+export type GroupRole = "OWNER" | "MODERATOR" | "MEMBER";
+
+export interface Group {
+  id: string;
+  name: string;
+  description?: string | null;
+  area?: string | null;
+  ward?: string | null;
+  creatorId: string;
+  creator?: ChatUser;
+  createdAt: string;
+  _count?: { members: number; topics: number };
+  topics?: GroupTopic[];
+}
+
+export interface GroupTopic {
+  id: string;
+  groupId: string;
+  name: string;
+  creatorId: string;
+  creator?: ChatUser;
+  createdAt: string;
+  _count?: { posts: number };
+}
+
+export interface GroupPost {
+  id: string;
+  topicId: string;
+  authorId: string;
+  author?: ChatUser;
+  body: string;
+  createdAt: string;
+}

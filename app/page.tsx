@@ -5,8 +5,9 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { useCart } from "@/lib/cart-context";
-import type { Product, Category, ProductVariant, Organization } from "@/lib/types";
+import type { Product, Category, ProductVariant, Organization, ShopQuestion } from "@/lib/types";
 
 const LocationDisplay = dynamic(() => import("@/components/LocationDisplay"), {
   ssr: false,
@@ -288,6 +289,29 @@ export default function HomePage() {
 function ShopInfoModal({ org, onClose }: { org: Organization; onClose: () => void }) {
   const lat = org.latitude ? Number(org.latitude) : null;
   const lng = org.longitude ? Number(org.longitude) : null;
+  const { user, token } = useAuth();
+  const [messageError, setMessageError] = useState<string | null>(null);
+  const [firstMessage, setFirstMessage] = useState("");
+  const [sent, setSent] = useState(false);
+
+  async function handleStartConversation() {
+    if (!user || !token) {
+      setMessageError("Log in to message this shop.");
+      return;
+    }
+    if (user.role !== "BUYER") {
+      setMessageError("Only buyer accounts can message a shop directly.");
+      return;
+    }
+    if (!firstMessage.trim()) return;
+    try {
+      await api.post("/chat/conversations", { organizationId: org.id, body: firstMessage.trim() }, token);
+      setSent(true);
+    } catch (err) {
+      const e = err as { message?: string | string[] };
+      setMessageError(Array.isArray(e.message) ? e.message[0] : e.message ?? "Could not send message");
+    }
+  }
 
   return (
     <div
@@ -295,7 +319,7 @@ function ShopInfoModal({ org, onClose }: { org: Organization; onClose: () => voi
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-[var(--radius-card)] shadow-elevated max-w-sm w-full p-6"
+        className="bg-white rounded-[var(--radius-card)] shadow-elevated max-w-sm w-full p-6 max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="font-display font-semibold text-lg text-[var(--color-ink-900)] mb-1">
@@ -325,6 +349,39 @@ function ShopInfoModal({ org, onClose }: { org: Organization; onClose: () => voi
           </p>
         )}
 
+        {/* Message the shop (buyer-initiated only, per the chat rule) */}
+        <div className="border-t border-[var(--color-border)] pt-4 mb-4">
+          <h4 className="text-sm font-semibold text-[var(--color-ink-900)] mb-2">
+            Message this shop
+          </h4>
+          {sent ? (
+            <p className="text-sm text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] rounded-lg px-3 py-2.5">
+              Sent! Open the chat bubble (bottom right) to continue the conversation.
+            </p>
+          ) : (
+            <>
+              <textarea
+                value={firstMessage}
+                onChange={(e) => setFirstMessage(e.target.value)}
+                placeholder="Ask a question or say what you need…"
+                rows={2}
+                className="w-full text-sm rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-2 mb-2 outline-none focus:border-[var(--color-emerald-500)]"
+              />
+              {messageError && <p className="text-xs text-red-600 mb-2">{messageError}</p>}
+              <button
+                onClick={handleStartConversation}
+                disabled={!firstMessage.trim()}
+                className="w-full bg-[var(--color-emerald-600)] text-white text-sm font-medium rounded-[var(--radius-pill)] py-2 disabled:opacity-40"
+              >
+                Send message
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Public Q&A board - "the common place where everyone can chat" */}
+        <ShopQABoard organizationId={org.id} />
+
         <button
           onClick={onClose}
           className="w-full text-sm text-[var(--color-ink-500)] text-center py-2"
@@ -332,6 +389,106 @@ function ShopInfoModal({ org, onClose }: { org: Organization; onClose: () => voi
           Close
         </button>
       </div>
+    </div>
+  );
+}
+
+function ShopQABoard({ organizationId }: { organizationId: string }) {
+  const { user, token } = useAuth();
+  const [questions, setQuestions] = useState<ShopQuestion[]>([]);
+  const [draft, setDraft] = useState("");
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+
+  function load() {
+    api.get<ShopQuestion[]>(`/chat/shops/${organizationId}/questions`).then(setQuestions).catch(() => {});
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId]);
+
+  async function handleAsk() {
+    if (!draft.trim() || !token) return;
+    const body = draft.trim();
+    setDraft("");
+    await api.post(`/chat/shops/${organizationId}/questions`, { body }, token);
+    load();
+  }
+
+  async function handleReply(questionId: string) {
+    const body = (replyDrafts[questionId] || "").trim();
+    if (!body || !token) return;
+    setReplyDrafts((prev) => ({ ...prev, [questionId]: "" }));
+    await api.post(`/chat/questions/${questionId}/replies`, { body }, token);
+    load();
+  }
+
+  return (
+    <div className="border-t border-[var(--color-border)] pt-4 mb-2">
+      <h4 className="text-sm font-semibold text-[var(--color-ink-900)] mb-2">
+        Questions &amp; answers
+      </h4>
+      <p className="text-xs text-[var(--color-ink-500)] mb-3">
+        Public — anyone can see and help answer.
+      </p>
+
+      {user && token && (
+        <div className="flex gap-2 mb-3">
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAsk()}
+            placeholder="Ask a question…"
+            className="flex-1 text-sm rounded-[var(--radius-pill)] border border-[var(--color-border)] px-3 py-1.5 outline-none focus:border-[var(--color-emerald-500)]"
+          />
+          <button
+            onClick={handleAsk}
+            disabled={!draft.trim()}
+            className="text-sm font-medium text-[var(--color-emerald-700)] disabled:opacity-40 shrink-0"
+          >
+            Ask
+          </button>
+        </div>
+      )}
+
+      {questions.length === 0 ? (
+        <p className="text-xs text-[var(--color-ink-500)]">No questions yet — be the first to ask.</p>
+      ) : (
+        <div className="space-y-3 max-h-64 overflow-y-auto">
+          {questions.map((q) => (
+            <div key={q.id} className="bg-[var(--color-cream-100)] rounded-[var(--radius-sm)] p-2.5">
+              <p className="text-xs font-medium text-[var(--color-ink-900)]">{q.asker?.fullName ?? "Someone"}</p>
+              <p className="text-sm text-[var(--color-ink-700)] mb-1.5">{q.body}</p>
+              {q.replies.map((r) => (
+                <div key={r.id} className="ml-3 mt-1 text-sm">
+                  <span className="font-medium text-[var(--color-emerald-700)]">
+                    {r.author?.fullName ?? "Reply"}:
+                  </span>{" "}
+                  <span className="text-[var(--color-ink-700)]">{r.body}</span>
+                </div>
+              ))}
+              {user && token && (
+                <div className="flex gap-2 mt-1.5">
+                  <input
+                    value={replyDrafts[q.id] || ""}
+                    onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                    onKeyDown={(e) => e.key === "Enter" && handleReply(q.id)}
+                    placeholder="Reply…"
+                    className="flex-1 text-xs rounded-[var(--radius-pill)] border border-[var(--color-border)] px-2.5 py-1 outline-none"
+                  />
+                  <button
+                    onClick={() => handleReply(q.id)}
+                    className="text-xs font-medium text-[var(--color-emerald-700)] shrink-0"
+                  >
+                    Reply
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
