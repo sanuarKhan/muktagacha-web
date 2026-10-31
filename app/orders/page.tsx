@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
+import ImageUploadField from "@/components/ImageUploadField";
 import type { Order } from "@/lib/types";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -51,6 +52,12 @@ export default function OrdersPage() {
     if (!token) return;
     await api.post(`/riders/orders/${orderId}/rate`, { rating }, token);
     setRated((prev) => ({ ...prev, [orderId]: true }));
+  }
+
+  async function uploadPrescription(orderId: string, imageUrl: string) {
+    if (!token) return;
+    const updated = await api.post<Order>(`/orders/${orderId}/prescription`, { imageUrl }, token);
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
   }
 
   if (authLoading || loading) {
@@ -148,6 +155,37 @@ export default function OrdersPage() {
             {PAYMENT_STATUS_LABEL[order.paymentVerification] && (
               <p className="text-xs text-[var(--color-ink-500)] mt-2 pt-2 border-t border-[var(--color-border)]">
                 {PAYMENT_STATUS_LABEL[order.paymentVerification]}
+              </p>
+            )}
+            {order.requiresPrescription && order.prescriptionStatus !== "APPROVED" && (
+              <div className="mt-2 pt-2 border-t border-[var(--color-border)]">
+                {order.prescriptionStatus === "PENDING_REVIEW" ? (
+                  <p className="text-xs text-[var(--color-gold-600)] bg-[var(--color-gold-50)] rounded-lg px-3 py-2">
+                    Prescription submitted — waiting for the pharmacy to review it.
+                  </p>
+                ) : (
+                  <div>
+                    {order.prescriptionRejectionNote && (
+                      <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-2">
+                        Prescription rejected: {order.prescriptionRejectionNote}. Please upload a clearer photo.
+                      </p>
+                    )}
+                    <p className="text-xs text-[var(--color-ink-700)] font-medium mb-1.5">
+                      💊 This order needs a prescription photo before the pharmacy can prepare it.
+                    </p>
+                    <ImageUploadField
+                      value={order.prescriptionImageUrl}
+                      onChange={(url) => uploadPrescription(order.id, url)}
+                      label="Prescription photo"
+                      size="sm"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+            {order.requiresPrescription && order.prescriptionStatus === "APPROVED" && (
+              <p className="text-xs text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] rounded-lg px-3 py-2 mt-2">
+                ✓ Prescription approved.
               </p>
             )}
             {order.status === "COMPLETED" && order.riderId && !rated[order.id] && (

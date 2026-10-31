@@ -28,6 +28,7 @@ import type {
   MarketingContact,
   MarketingCampaign,
   RiderProfile,
+  ServiceRequest,
 } from "@/lib/types";
 
 const inputClass =
@@ -180,12 +181,13 @@ type VariantDraft = {
   priceOverride: string;
 };
 
-type Tab = "home" | "products" | "orders" | "marketing" | "settings";
+type Tab = "home" | "products" | "orders" | "bookings" | "marketing" | "settings";
 
 const NAV_ITEMS: { id: Tab; label: string; icon: string }[] = [
   { id: "home", label: "Home", icon: "●" },
   { id: "products", label: "Products", icon: "▦" },
   { id: "orders", label: "Orders", icon: "▤" },
+  { id: "bookings", label: "Bookings", icon: "📅" },
   { id: "marketing", label: "Marketing", icon: "◆" },
   { id: "settings", label: "Settings", icon: "⚙" },
 ];
@@ -194,24 +196,36 @@ function VendorDashboard({ org, token }: { org: Organization; token: string }) {
   const [tab, setTab] = useState<Tab>("home");
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [bookings, setBookings] = useState<ServiceRequest[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const isServices = org.vertical === "SERVICES";
+  const navItems = NAV_ITEMS.filter((item) => {
+    if (item.id === "bookings") return isServices;
+    if (item.id === "products") return !isServices;
+    return true;
+  });
 
   useEffect(() => {
     Promise.all([
       api.get<Product[]>(`/products/organization/${org.id}`),
       api.get<Order[]>(`/orders/organization/${org.id}`, token),
       api.get<Category[]>(`/categories?vertical=${org.vertical}`),
+      isServices
+        ? api.get<ServiceRequest[]>(`/service-requests/organization/${org.id}`, token)
+        : Promise.resolve([]),
     ])
-      .then(([p, o, c]) => {
+      .then(([p, o, c, b]) => {
         setProducts(p);
         setOrders(o);
         setCategories(c);
+        setBookings(b);
       })
       .finally(() => setLoadingData(false));
-  }, [org.id, org.vertical, token]);
+  }, [org.id, org.vertical, token, isServices]);
 
   const pendingOrders = orders.filter((o) => o.status === "PENDING").length;
+  const pendingBookings = bookings.filter((b) => b.status === "REQUESTED").length;
   const pendingPayments = orders.filter(
     (o) => o.paymentVerification === "PENDING_VERIFICATION",
   ).length;
@@ -220,6 +234,7 @@ function VendorDashboard({ org, token }: { org: Organization; token: string }) {
     .reduce(
       (sum, o) => sum + o.items.reduce((s, it) => s + Number(it.price) * it.quantity, 0),
       0,
+
     );
 
   return (
@@ -265,7 +280,7 @@ function VendorDashboard({ org, token }: { org: Organization; token: string }) {
       <div className="flex gap-6 flex-col md:flex-row">
         <aside className="md:w-48 flex-shrink-0">
           <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-1 md:pb-0">
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => setTab(item.id)}
@@ -286,6 +301,17 @@ function VendorDashboard({ org, token }: { org: Organization; token: string }) {
                     }`}
                   >
                     {pendingOrders}
+                  </span>
+                )}
+                {item.id === "bookings" && pendingBookings > 0 && (
+                  <span
+                    className={`ml-auto text-xs rounded-full px-1.5 ${
+                      tab === item.id
+                        ? "bg-white/20"
+                        : "bg-[var(--color-gold-500)] text-white"
+                    }`}
+                  >
+                    {pendingBookings}
                   </span>
                 )}
               </button>
@@ -315,6 +341,8 @@ function VendorDashboard({ org, token }: { org: Organization; token: string }) {
             />
           ) : tab === "orders" ? (
             <OrdersTab org={org} token={token} orders={orders} setOrders={setOrders} />
+          ) : tab === "bookings" ? (
+            <BookingsTab org={org} token={token} bookings={bookings} setBookings={setBookings} />
           ) : tab === "marketing" ? (
             <MarketingTab org={org} token={token} />
           ) : (
@@ -322,6 +350,7 @@ function VendorDashboard({ org, token }: { org: Organization; token: string }) {
           )}
         </main>
       </div>
+
     </div>
   );
 }
@@ -627,6 +656,9 @@ function ProductForm({
     basePrice: product?.basePrice ? String(product.basePrice) : "",
     categoryId: product?.categoryId ?? "",
   });
+  const [requiresPrescription, setRequiresPrescription] = useState(
+    (product as any)?.requiresPrescription ?? false,
+  );
   const [saving, setSaving] = useState(false);
 
   async function getUploadSignature(): Promise<CloudinaryUploadSignature> {
@@ -682,6 +714,7 @@ function ProductForm({
         description: form.description || undefined,
         basePrice: Number(form.basePrice),
         hasVariants,
+        requiresPrescription: org.vertical === "PHARMACY" ? requiresPrescription : undefined,
         images: cleanImages,
         variants: builtVariants,
       };
@@ -819,6 +852,18 @@ function ProductForm({
           This product comes in different sizes or colors
         </label>
 
+        {org.vertical === "PHARMACY" && (
+          <label className="flex items-center gap-2.5 text-sm text-[var(--color-ink-700)] bg-[var(--color-gold-50)] rounded-[12px] px-4 py-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={requiresPrescription}
+              onChange={(e) => setRequiresPrescription(e.target.checked)}
+              className="w-4 h-4 accent-[var(--color-emerald-700)]"
+            />
+            Requires a doctor's prescription (buyer must upload one before ordering)
+          </label>
+        )}
+
         {hasVariants && (
           <div className="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-cream-100)]/60 p-4 space-y-3">
             <p className="text-xs text-[var(--color-ink-500)]">
@@ -896,6 +941,171 @@ function ProductForm({
   );
 }
 
+function BookingsTab({
+  org,
+  token,
+  bookings,
+  setBookings,
+}: {
+  org: Organization;
+  token: string;
+  bookings: ServiceRequest[];
+  setBookings: React.Dispatch<React.SetStateAction<ServiceRequest[]>>;
+}) {
+  const [filter, setFilter] = useState<string>("ALL");
+  const [quoteDrafts, setQuoteDrafts] = useState<Record<string, { price: string; note: string }>>({});
+
+  async function sendQuote(id: string) {
+    const draft = quoteDrafts[id];
+    if (!draft?.price) return;
+    const updated = await api.patch<ServiceRequest>(
+      `/service-requests/${id}/quote`,
+      { quotedPrice: Number(draft.price), quoteNote: draft.note || undefined },
+      token,
+    );
+    setBookings((prev) => prev.map((b) => (b.id === id ? updated : b)));
+    setQuoteDrafts((prev) => ({ ...prev, [id]: { price: "", note: "" } }));
+  }
+
+  async function updateStatus(id: string, status: string) {
+    const updated = await api.patch<ServiceRequest>(
+      `/service-requests/${id}/status`,
+      { status },
+      token,
+    );
+    setBookings((prev) => prev.map((b) => (b.id === id ? updated : b)));
+  }
+
+  const FILTERS = ["ALL", "REQUESTED", "QUOTED", "ACCEPTED", "IN_PROGRESS", "COMPLETED", "DECLINED", "CANCELLED"];
+  const filtered = filter === "ALL" ? bookings : bookings.filter((b) => b.status === filter);
+
+  return (
+    <div>
+      <h2 className="font-display text-lg font-semibold text-[var(--color-ink-900)] mb-4">
+        Bookings ({bookings.length})
+      </h2>
+
+      <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
+        {FILTERS.map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`text-xs px-3 py-1.5 rounded-full font-medium whitespace-nowrap transition-colors ${
+              filter === f
+                ? "bg-[var(--color-emerald-700)] text-white"
+                : "bg-white text-[var(--color-ink-500)] hover:bg-[var(--color-emerald-50)]"
+            }`}
+          >
+            {f.replace(/_/g, " ")}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 && (
+        <p className="text-sm text-[var(--color-ink-300)] bg-white rounded-[var(--radius-card)] shadow-card p-4">
+          No bookings in this view.
+        </p>
+      )}
+
+      <div className="space-y-3">
+        {filtered.map((b) => (
+          <div key={b.id} className="rounded-[14px] border border-[var(--color-border)] bg-white p-4">
+            <div className="flex items-start justify-between gap-2 flex-wrap mb-2">
+              <div>
+                <p className="font-medium text-[var(--color-ink-900)]">{b.buyer?.fullName ?? "Customer"}</p>
+                <p className="text-xs text-[var(--color-ink-500)]">{b.buyer?.phone}</p>
+              </div>
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-[var(--color-cream-100)] text-[var(--color-ink-700)]">
+                {b.status.replace(/_/g, " ")}
+              </span>
+            </div>
+            <p className="text-sm text-[var(--color-ink-700)] mb-2">{b.description}</p>
+            {b.preferredTime && (
+              <p className="text-xs text-[var(--color-ink-500)]">Preferred time: {b.preferredTime}</p>
+            )}
+            {b.addressText && (
+              <p className="text-xs text-[var(--color-ink-500)]">Address: {b.addressText}</p>
+            )}
+
+            {b.status === "REQUESTED" && (
+              <div className="mt-3 pt-3 border-t border-[var(--color-border)] flex gap-2 flex-wrap items-end">
+                <div>
+                  <label className="block text-xs font-medium text-[var(--color-ink-700)] mb-1">
+                    Your quote (৳)
+                  </label>
+                  <input
+                    type="number"
+                    value={quoteDrafts[b.id]?.price ?? ""}
+                    onChange={(e) =>
+                      setQuoteDrafts((prev) => ({
+                        ...prev,
+                        [b.id]: { ...prev[b.id], price: e.target.value, note: prev[b.id]?.note ?? "" },
+                      }))
+                    }
+                    className="border border-[var(--color-border)] rounded-[10px] px-3 py-1.5 text-sm w-28"
+                  />
+                </div>
+                <div className="flex-1 min-w-[140px]">
+                  <label className="block text-xs font-medium text-[var(--color-ink-700)] mb-1">
+                    Note (optional)
+                  </label>
+                  <input
+                    value={quoteDrafts[b.id]?.note ?? ""}
+                    onChange={(e) =>
+                      setQuoteDrafts((prev) => ({
+                        ...prev,
+                        [b.id]: { price: prev[b.id]?.price ?? "", note: e.target.value },
+                      }))
+                    }
+                    className="border border-[var(--color-border)] rounded-[10px] px-3 py-1.5 text-sm w-full"
+                  />
+                </div>
+                <button
+                  onClick={() => sendQuote(b.id)}
+                  disabled={!quoteDrafts[b.id]?.price}
+                  className="bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)] disabled:opacity-50"
+                >
+                  Send quote
+                </button>
+                <button
+                  onClick={() => updateStatus(b.id, "DECLINED")}
+                  className="bg-red-50 text-red-700 rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium hover:bg-red-100"
+                >
+                  Decline
+                </button>
+              </div>
+            )}
+
+            {b.status === "QUOTED" && (
+              <p className="text-xs text-[var(--color-gold-600)] bg-[var(--color-gold-50)] rounded-lg px-3 py-2 mt-2">
+                Quoted ৳{b.quotedPrice} — waiting for the customer to accept.
+              </p>
+            )}
+
+            {b.status === "ACCEPTED" && (
+              <button
+                onClick={() => updateStatus(b.id, "IN_PROGRESS")}
+                className="mt-2 bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)]"
+              >
+                Mark as started
+              </button>
+            )}
+
+            {b.status === "IN_PROGRESS" && (
+              <button
+                onClick={() => updateStatus(b.id, "COMPLETED")}
+                className="mt-2 bg-[var(--color-emerald-700)] text-white rounded-[var(--radius-pill)] px-4 py-2 text-sm font-medium hover:bg-[var(--color-emerald-900)]"
+              >
+                Mark as completed
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function OrdersTab({
   org,
   token,
@@ -933,6 +1143,19 @@ function OrdersTab({
     const updated = await api.post<Order>(
       `/riders/orders/${orderId}/assign`,
       { riderId },
+      token,
+    );
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+  }
+
+  async function reviewPrescription(orderId: string, decision: "APPROVED" | "REJECTED") {
+    let note: string | undefined;
+    if (decision === "REJECTED") {
+      note = window.prompt("Why is this prescription being rejected? (shown to the buyer)") ?? undefined;
+    }
+    const updated = await api.patch<Order>(
+      `/orders/${orderId}/prescription-review`,
+      { decision, note },
       token,
     );
     setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
@@ -1030,6 +1253,51 @@ function OrdersTab({
                       Reject
                     </button>
                   </div>
+                )}
+              </div>
+            )}
+
+            {order.requiresPrescription && (
+              <div className="mt-2 pt-2 border-t border-[var(--color-border)]">
+                {order.prescriptionStatus === "PENDING_UPLOAD" && (
+                  <p className="text-xs text-[var(--color-ink-500)]">
+                    💊 Waiting for the buyer to upload their prescription.
+                  </p>
+                )}
+                {order.prescriptionStatus === "PENDING_REVIEW" && (
+                  <div>
+                    <p className="text-xs text-[var(--color-gold-600)] font-medium mb-1.5">
+                      💊 Prescription uploaded — review before confirming this order.
+                    </p>
+                    {order.prescriptionImageUrl && (
+                      <a href={order.prescriptionImageUrl} target="_blank" rel="noopener noreferrer">
+                        <img
+                          src={order.prescriptionImageUrl}
+                          alt="Prescription"
+                          className="h-24 rounded-[10px] border border-[var(--color-border)] object-cover mb-2"
+                        />
+                      </a>
+                    )}
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => reviewPrescription(order.id, "APPROVED")}
+                        className="text-xs bg-[var(--color-emerald-700)] text-white px-2.5 py-1 rounded-full font-medium hover:bg-[var(--color-emerald-900)]"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => reviewPrescription(order.id, "REJECTED")}
+                        className="text-xs bg-red-50 text-red-700 px-2.5 py-1 rounded-full font-medium hover:bg-red-100"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {order.prescriptionStatus === "APPROVED" && (
+                  <p className="text-xs text-[var(--color-emerald-700)] font-medium">
+                    ✓ Prescription approved.
+                  </p>
                 )}
               </div>
             )}

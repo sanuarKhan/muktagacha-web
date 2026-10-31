@@ -86,6 +86,7 @@ export interface Product {
   description?: string | null;
   basePrice: string;
   hasVariants: boolean;
+  requiresPrescription?: boolean;
   images: ProductImage[];
   variants: ProductVariant[];
   isActive: boolean;
@@ -104,6 +105,8 @@ export interface OrderItem {
   quantity: number;
   price: string;
 }
+
+export type PrescriptionStatus = "NOT_REQUIRED" | "PENDING_UPLOAD" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
 
 export interface Order {
   id: string;
@@ -126,6 +129,10 @@ export interface Order {
   recipient?: User | null;
   giftMessage?: string | null;
   giftSenderAnonymous?: boolean;
+  requiresPrescription?: boolean;
+  prescriptionImageUrl?: string | null;
+  prescriptionStatus?: PrescriptionStatus;
+  prescriptionRejectionNote?: string | null;
   createdAt: string;
   items: OrderItem[];
   organization?: Organization;
@@ -264,4 +271,36 @@ export interface GroupPost {
   body: string;
   isAnonymous?: boolean;
   createdAt: string;
+}
+
+export type ServiceRequestStatus =
+  | "REQUESTED"
+  | "QUOTED"
+  | "ACCEPTED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "DECLINED"
+  | "CANCELLED";
+
+export interface ServiceRequest {
+  id: string;
+  buyerId: string;
+  buyer?: User;
+  organizationId: string;
+  organization?: Organization;
+  categoryId?: string | null;
+  category?: Category | null;
+  description: string;
+  photoUrl?: string | null;
+  addressText?: string | null;
+  preferredTime?: string | null;
+  status: ServiceRequestStatus;
+  quotedPrice?: string | null;
+  quoteNote?: string | null;
+  quotedAt?: string | null;
+  paymentMethod?: PaymentMethod | null;
+  paymentVerification?: PaymentVerificationStatus;
+  paymentTrxId?: string | null;
+  createdAt: string;
+  completedAt?: string | null;
 }
