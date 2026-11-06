@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useCart } from "@/lib/cart-context";
+import CategoryStrip from "@/components/CategoryStrip";
+import FilterPanel, {
+  EMPTY_FILTERS,
+  applyFilters,
+  countActive,
+  type Filters,
+} from "@/components/FilterPanel";
 import type { Product, Category, ProductVariant, Organization, ShopQuestion } from "@/lib/types";
 
 const LocationDisplay = dynamic(() => import("@/components/LocationDisplay"), {
@@ -18,14 +25,6 @@ const LocationDisplay = dynamic(() => import("@/components/LocationDisplay"), {
   ),
 });
 
-const CATEGORY_HERO_IMAGES: Record<string, string> = {
-  Groceries:
-    "https://images.pexels.com/photos/35000204/pexels-photo-35000204.jpeg?auto=compress&cs=tinysrgb&h=600&w=800",
-  Clothing:
-    "https://images.pexels.com/photos/36890954/pexels-photo-36890954.jpeg?auto=compress&cs=tinysrgb&h=600&w=800",
-  Cosmetics:
-    "https://images.pexels.com/photos/34643810/pexels-photo-34643810.jpeg?auto=compress&cs=tinysrgb&h=600&w=800",
-};
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -36,6 +35,16 @@ export default function HomePage() {
   const { addItem, lines } = useCart();
   const [variantPicker, setVariantPicker] = useState<Product | null>(null);
   const [shopModal, setShopModal] = useState<Organization | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+
+  // Category narrows server-side (it's an API query); the remaining
+  // facets are applied in the browser over that result set.
+  const visibleProducts = useMemo(
+    () => applyFilters(products, filters),
+    [products, filters],
+  );
+  const activeFilterCount = countActive(filters);
 
   useEffect(() => {
     api.get<Category[]>("/categories?vertical=MARKETPLACE").then(setCategories);
@@ -44,6 +53,10 @@ export default function HomePage() {
   useEffect(() => {
     setLoading(true);
     setError(null);
+    // Reset facet filters when the category changes. A shop or price range
+    // valid in one category usually matches nothing in another, which would
+    // land the user on an empty page they didn't ask for.
+    setFilters(EMPTY_FILTERS);
     const qs = categoryId ? `?categoryId=${encodeURIComponent(categoryId)}` : "";
     api
       .get<Product[]>(`/products${qs}`)
@@ -108,64 +121,58 @@ export default function HomePage() {
       </section>
 
       <div id="browse" className="max-w-6xl mx-auto px-5 sm:px-8 py-12 sm:py-16">
-        {/* Category cards - real admin-managed taxonomy */}
-        {categories.length > 0 && (
-          <div className="grid grid-cols-3 gap-3 sm:gap-5 mb-12">
-            {categories.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setCategoryId(categoryId === c.id ? "" : c.id)}
-                className={`group relative aspect-[4/3] rounded-[var(--radius-card)] overflow-hidden shadow-card hover:shadow-hover-card transition-all ${
-                  categoryId === c.id
-                    ? "ring-2 ring-[var(--color-emerald-600)] ring-offset-2 ring-offset-[var(--color-cream-50)]"
-                    : ""
-                }`}
-              >
-                <Image
-                  src={
-                    CATEGORY_HERO_IMAGES[c.name] ??
-                    CATEGORY_HERO_IMAGES.Groceries
-                  }
-                  alt={c.name}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-500"
-                  sizes="(max-width: 640px) 33vw, 200px"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-ink-900)]/70 via-transparent to-transparent" />
-                <span className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 text-[var(--color-cream-50)] font-display font-semibold text-sm sm:text-lg">
-                  {c.name}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
+        {/*
+          Compact, swipeable category strip. Replaced a 3-column grid of
+          large 4:3 photo cards: only 3 categories had a hero image mapped,
+          so every other one silently reused the Groceries photo and they
+          all looked identical — and the tall cards pushed real products
+          below the fold.
+        */}
+        <CategoryStrip
+          categories={categories}
+          selectedId={categoryId}
+          onSelect={setCategoryId}
+        />
 
-        <div className="flex items-center justify-between mb-6">
-          <div>
+        {/* Sticky so Filters stays reachable while scrolling a long list. */}
+        <div className="flex items-center justify-between gap-3 mb-6 sticky top-0 z-30 bg-[var(--color-cream-50)]/92 backdrop-blur-sm py-3 -mx-5 px-5 sm:-mx-8 sm:px-8">
+          <div className="min-w-0">
             <h2 className="font-display text-2xl font-semibold text-[var(--color-ink-900)]">
               {selectedCategory ? selectedCategory.name : "All products"}
             </h2>
             <p className="text-[var(--color-ink-500)] text-sm mt-1">
-              {products.length} item{products.length === 1 ? "" : "s"} from
-              local vendors
+              {visibleProducts.length} item
+              {visibleProducts.length === 1 ? "" : "s"}
+              {activeFilterCount > 0 && products.length !== visibleProducts.length
+                ? ` of ${products.length}`
+                : ""}{" "}
+              from local vendors
             </p>
           </div>
-          {categoryId && (
+
+          <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => setCategoryId("")}
-              className="text-sm text-[var(--color-emerald-700)] font-medium hover:underline"
+              onClick={() => setFiltersOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-[var(--radius-pill)] border border-[var(--color-border)] bg-white text-sm font-medium text-[var(--color-ink-700)] hover:border-[var(--color-emerald-600)] hover:text-[var(--color-emerald-700)] transition-colors shadow-card"
             >
-              Clear filter
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" /></svg>
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="ml-0.5 min-w-[20px] h-5 px-1.5 rounded-full bg-[var(--color-emerald-700)] text-[var(--color-cream-50)] text-[11px] font-semibold flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
-          )}
-          {lines.length > 0 && (
-            <Link
-              href="/checkout"
-              className="bg-[var(--color-emerald-700)] text-[var(--color-cream-50)] px-4 py-2.5 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors shadow-card"
-            >
-              Cart ({lines.reduce((n, l) => n + l.quantity, 0)})
-            </Link>
-          )}
+
+            {lines.length > 0 && (
+              <Link
+                href="/checkout"
+                className="bg-[var(--color-emerald-700)] text-[var(--color-cream-50)] px-4 py-2.5 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors shadow-card"
+              >
+                Cart ({lines.reduce((n, l) => n + l.quantity, 0)})
+              </Link>
+            )}
+          </div>
         </div>
 
         {loading && (
@@ -185,16 +192,28 @@ export default function HomePage() {
           </div>
         )}
 
-        {!loading && !error && products.length === 0 && (
+        {!loading && !error && visibleProducts.length === 0 && (
           <div className="rounded-[var(--radius-card)] bg-[var(--color-cream-100)] p-10 text-center">
             <p className="text-[var(--color-ink-500)]">
-              No products yet in this category. Check back soon!
+              {products.length > 0
+                ? "No products match these filters."
+                : "No products yet in this category. Check back soon!"}
             </p>
+            {/* When filters caused the empty state, give a one-click way
+                out — otherwise the page looks broken. */}
+            {products.length > 0 && activeFilterCount > 0 && (
+              <button
+                onClick={() => setFilters(EMPTY_FILTERS)}
+                className="mt-4 text-sm font-medium text-[var(--color-emerald-700)] hover:underline"
+              >
+                Clear all filters
+              </button>
+            )}
           </div>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-          {products.map((product) => (
+          {visibleProducts.map((product) => (
             <div
               key={product.id}
               className="bg-white rounded-[var(--radius-card)] shadow-card hover:shadow-hover-card transition-shadow overflow-hidden flex flex-col"
@@ -282,6 +301,17 @@ export default function HomePage() {
       {shopModal && (
         <ShopInfoModal org={shopModal} onClose={() => setShopModal(null)} />
       )}
+
+      {/* Options are derived from `products` (the category-level result set),
+          not from the already-filtered list — otherwise unticking a filter
+          could make its own option disappear. */}
+      <FilterPanel
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        products={products}
+        filters={filters}
+        onChange={setFilters}
+      />
     </div>
   );
 }
