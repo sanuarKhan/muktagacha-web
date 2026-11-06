@@ -151,7 +151,9 @@ export default function CategoryStrip({
           {/* "All" resets the filter and is always first. */}
           <CategoryPill
             label="All"
-            monogram="＊"
+            // Plain ASCII, not a decorative glyph: the fullwidth asterisk
+            // "＊" rendered as a .notdef box in the shipped font stack.
+            monogram="ALL"
             active={selectedId === ""}
             color={{ from: "#4A4238", to: "#7A7064", glow: "rgba(122,112,100,0.22)" }}
             onClick={() => onSelect("")}
@@ -211,7 +213,7 @@ function CategoryPill({
       >
         {/* Monogram tile carries the colour identity when not selected. */}
         <span
-          className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold tracking-wide shrink-0 transition-transform duration-300 group-hover:scale-110"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold tracking-tight shrink-0 transition-transform duration-300 group-hover:scale-110"
           style={{
             background: active
               ? "rgba(255,255,255,0.22)"
