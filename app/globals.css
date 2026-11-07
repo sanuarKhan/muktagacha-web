@@ -1,4 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap');
+/*
+ * NOTE: the Google Fonts @import that used to live here was silently
+ * dropped by Tailwind v4's CSS processing, so NO webfont was loading at
+ * all in production (verified: zero font requests on the live page, and
+ * document.fonts empty). Everything was falling back to system fonts,
+ * which is also why the Taka sign rendered as a .notdef box.
+ * The fonts are now loaded via <link> tags in app/layout.tsx instead,
+ * where nothing can strip them.
+ */
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
