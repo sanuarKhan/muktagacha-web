@@ -19,13 +19,19 @@ export default function CommunityPage() {
 
   function load() {
     setLoading(true);
+    // Pass the token when we have one. The list is public so logged-out
+    // visitors can browse, but sending it keeps the request consistent with
+    // the rest of the app and lets the API personalise later if needed.
     api
-      .get<Group[]>("/groups")
+      .get<Group[]>("/groups", token ?? undefined)
       .then(setGroups)
+      .catch(() => setGroups([]))
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, []);
+  // Re-run when auth resolves: on first paint `token` is still null, so a
+  // load() that ignored it would cache an empty list for logged-in users.
+  useEffect(load, [token]);
 
   async function handleCreate() {
     if (!name.trim() || !token) return;
