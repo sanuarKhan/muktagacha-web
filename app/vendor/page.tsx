@@ -7,6 +7,7 @@ import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import ImageUploadField from "@/components/ImageUploadField";
+import VendorSmsPhone from "@/components/VendorSmsPhone";
 
 // Leaflet touches window/document, so it must be loaded client-side
 // only - dynamic() with ssr:false is the standard Next.js fix.
@@ -1716,6 +1717,10 @@ function MarketingTab({ org, token }: { org: Organization; token: string }) {
         Upload your customers' phone numbers and send them a promotional SMS
         whenever you want — new stock, a sale, anything.
       </p>
+
+      {/* Your own phone sends the campaigns, so customers see YOUR number
+          and the cost falls on your own SIM rather than the platform's. */}
+      <VendorSmsPhone orgId={org.id} token={token} />
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Contacts */}
