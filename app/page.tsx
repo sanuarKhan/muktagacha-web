@@ -83,7 +83,7 @@ export default function HomePage() {
       <section className="relative overflow-hidden">
         <div className="absolute inset-0">
           <Image
-            src="/banner/hero-banner.jpg"
+            src="/banner/hero-banner.png"
             alt="Muktagacha — shop local online"
             fill
             priority
@@ -264,7 +264,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-5 sm:px-8 grid sm:grid-cols-2 gap-10 items-center">
           <div className="relative aspect-[4/3] rounded-[var(--radius-card)] overflow-hidden shadow-elevated">
             <Image
-              src="https://images.pexels.com/photos/36330752/pexels-photo-36330752.jpeg?auto=compress&cs=tinysrgb&h=900&w=1200"
+              src="trust.png?auto=compress&cs=tinysrgb&h=900&w=1200"
               alt="A local Muktagacha shop owner"
               fill
               className="object-cover"
