@@ -26,7 +26,12 @@ function GroupPage() {
   const [topicName, setTopicName] = useState("");
 
   function loadGroup() {
-    api.get<Group>(`/groups/${groupId}`).then(setGroup);
+    // Without a catch, any failure left `group` null and the page stuck on
+    // its loading state forever with no explanation.
+    api
+      .get<Group>(`/groups/${groupId}`, token ?? undefined)
+      .then(setGroup)
+      .catch(() => setError("Couldn't load this group. Please refresh and try again."));
   }
 
   function loadTopics() {
