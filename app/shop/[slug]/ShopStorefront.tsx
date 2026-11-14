@@ -245,7 +245,7 @@ export default function ShopStorefront({
                       onClick={() => add(p)}
                       className="bg-[var(--color-emerald-700)] text-[var(--color-cream-50)] px-3 py-1.5 rounded-[var(--radius-pill)] text-xs sm:text-sm font-medium hover:bg-[var(--color-emerald-900)]"
                     >
-                      {p.hasVariants ? "Options" : "Add to cart"}
+                      {p.hasVariants && p.variants.length > 0 ? "Options" : "Add to cart"}
                     </button>
                   </div>
                 </div>
