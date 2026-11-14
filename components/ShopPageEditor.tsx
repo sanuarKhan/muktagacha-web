@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import ImageUploadField from "@/components/ImageUploadField";
-import type { Organization } from "@/lib/types";
+import type { CloudinaryUploadSignature, Organization } from "@/lib/types";
 
 const SITE_URL = "https://muktagacha.skodedigital.tech";
 
@@ -44,6 +44,10 @@ export default function ShopPageEditor({ org, token }: { org: Organization; toke
 
   function set<K extends keyof typeof form>(k: K, v: string) {
     setForm((f) => ({ ...f, [k]: v }));
+  }
+
+  function getUploadSignature(): Promise<CloudinaryUploadSignature> {
+    return api.get<CloudinaryUploadSignature>(`/organizations/${org.id}/cloudinary/upload-signature`, token);
   }
 
   async function save(e: React.FormEvent) {
@@ -180,8 +184,21 @@ export default function ShopPageEditor({ org, token }: { org: Organization; toke
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
-          <ImageUploadField value={form.logoUrl} onChange={(url) => set("logoUrl", url)} label="Logo (square)" />
-          <ImageUploadField value={form.bannerUrl} onChange={(url) => set("bannerUrl", url)} label="Banner (wide)" />
+          {/* Uploaded to Cloudinary (not stored as base64) so the images
+              have real URLs — Facebook/WhatsApp link previews can only
+              show an image that lives at a URL, never an inline blob. */}
+          <ImageUploadField
+            value={form.logoUrl}
+            onChange={(url) => set("logoUrl", url)}
+            label="Logo (square)"
+            getUploadSignature={getUploadSignature}
+          />
+          <ImageUploadField
+            value={form.bannerUrl}
+            onChange={(url) => set("bannerUrl", url)}
+            label="Banner (wide)"
+            getUploadSignature={getUploadSignature}
+          />
         </div>
         <p className="text-xs text-[var(--color-ink-500)] -mt-2">
           Banner looks best wide, around 1600 × 500. It also shows as the preview when your link is shared.

@@ -67,7 +67,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     shop.tagline ||
     shop.description?.slice(0, 160) ||
     `Shop ${products.length} products from ${shop.name}${shop.area ? ` in ${shop.area}` : ""} on Muktagacha.`;
-  const image = shop.bannerUrl || shop.logoUrl || products[0]?.images?.[0]?.url;
+  // Link previews (Facebook, WhatsApp) can only load an image from a real
+  // URL. Older shops stored their logo as an inline base64 blob, which would
+  // break the preview, so skip anything that isn't http(s) and fall back to a
+  // product photo, then the marketplace banner.
+  const isUrl = (u?: string | null) => !!u && /^https?:\/\//i.test(u);
+  const image =
+    [shop.bannerUrl, shop.logoUrl, ...products.map((p) => p.images?.[0]?.url)].find(isUrl) ??
+    `${SITE_URL}/banner/hero-banner.jpg`;
   const url = `${SITE_URL}/shop/${shop.slug || shop.id}`;
 
   return {
@@ -80,13 +87,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url,
       siteName: "Muktagacha",
       type: "website",
-      ...(image ? { images: [{ url: image }] } : {}),
+      images: [{ url: image }],
     },
     twitter: {
-      card: image ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title: shop.name,
       description,
-      ...(image ? { images: [image] } : {}),
+      images: [image],
     },
   };
 }
