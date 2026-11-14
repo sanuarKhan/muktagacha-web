@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import ImageUploadField from "@/components/ImageUploadField";
 import VendorSmsPhone from "@/components/VendorSmsPhone";
+import ShopPageEditor from "@/components/ShopPageEditor";
 
 // Leaflet touches window/document, so it must be loaded client-side
 // only - dynamic() with ssr:false is the standard Next.js fix.
@@ -2012,7 +2013,7 @@ function SettingsTab({ org, token }: { org: Organization; token: string }) {
   }
 
   const SECTIONS: { id: SettingsSection; label: string }[] = [
-    { id: "profile", label: "Shop profile" },
+    { id: "profile", label: "Shop page" },
     { id: "payment", label: "Payment numbers" },
     { id: "images", label: "Image uploads" },
     { id: "skodepay", label: "SkodePay" },
@@ -2042,29 +2043,7 @@ function SettingsTab({ org, token }: { org: Organization; token: string }) {
         ))}
       </div>
 
-      {section === "profile" && (
-        <div className="bg-white rounded-[var(--radius-card)] shadow-card p-5 max-w-sm space-y-2">
-          <p className="text-sm text-[var(--color-ink-700)]">
-            <span className="text-[var(--color-ink-500)]">Shop name:</span> {org.name}
-          </p>
-          <p className="text-sm text-[var(--color-ink-700)]">
-            <span className="text-[var(--color-ink-500)]">Type:</span> {org.vertical}
-          </p>
-          <p className="text-sm text-[var(--color-ink-700)]">
-            <span className="text-[var(--color-ink-500)]">Area:</span> {org.area}
-            {org.ward ? ` · ${org.ward}` : ""}
-          </p>
-          <p className="text-sm text-[var(--color-ink-700)]">
-            <span className="text-[var(--color-ink-500)]">Status:</span>{" "}
-            <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLE[org.approvalStatus]}`}>
-              {org.approvalStatus}
-            </span>
-          </p>
-          <p className="text-xs text-[var(--color-ink-300)] pt-2">
-            To change your shop name, photo, or area, contact admin support.
-          </p>
-        </div>
-      )}
+      {section === "profile" && <ShopPageEditor org={org} token={token} />}
 
       {section === "payment" && (
         <form

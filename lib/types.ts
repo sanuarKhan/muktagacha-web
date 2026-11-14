@@ -28,7 +28,7 @@ export type VerificationStatus = "UNVERIFIED" | "PENDING_REVIEW" | "VERIFIED" | 
 
 export interface Organization {
   id: string;
-  ownerUserId: string;
+  ownerUserId?: string;
   name: string;
   logoUrl?: string | null;
   vertical: Vertical;
@@ -50,6 +50,13 @@ export interface Organization {
   verifiedAt?: string | null;
   avgRating?: string | null;
   reviewCount?: number;
+  // Public shop page (/shop/<slug>)
+  slug?: string | null;
+  bannerUrl?: string | null;
+  tagline?: string | null;
+  description?: string | null;
+  facebookUrl?: string | null;
+  whatsappNumber?: string | null;
 }
 
 export interface ShopReview {

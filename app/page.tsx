@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useCart } from "@/lib/cart-context";
 import CategoryStrip from "@/components/CategoryStrip";
+import VariantPickerModal from "@/components/VariantPickerModal";
 import FilterPanel, {
   EMPTY_FILTERS,
   applyFilters,
@@ -375,6 +376,13 @@ function ShopInfoModal({ org, onClose }: { org: Organization; onClose: () => voi
           <p className="text-xs text-[var(--color-ink-300)] mb-4">No reviews yet</p>
         )}
 
+        <Link
+          href={`/shop/${org.slug || org.id}`}
+          className="block text-center mb-4 bg-[var(--color-emerald-700)] text-[var(--color-cream-50)] rounded-[var(--radius-pill)] py-2.5 text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors"
+        >
+          Visit shop — see all products →
+        </Link>
+
         {lat != null && lng != null ? (
           <div className="mb-4">
             <LocationDisplay lat={lat} lng={lng} label={org.name} height={200} />
@@ -600,63 +608,3 @@ function ShopQABoard({ organizationId }: { organizationId: string }) {
   );
 }
 
-function VariantPickerModal({
-  product,
-  onClose,
-  onSelect,
-}: {
-  product: Product;
-  onClose: () => void;
-  onSelect: (variant: ProductVariant) => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 bg-[var(--color-ink-900)]/50 flex items-end sm:items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-[var(--radius-card)] shadow-elevated max-w-sm w-full p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="font-display font-semibold text-lg text-[var(--color-ink-900)] mb-1">
-          {product.name}
-        </h3>
-        <p className="text-sm text-[var(--color-ink-500)] mb-4">
-          Choose an option
-        </p>
-        <div className="space-y-2 max-h-72 overflow-y-auto">
-          {product.variants
-            .filter((v) => v.isActive && v.stockCount > 0)
-            .map((v) => (
-              <button
-                key={v.id}
-                onClick={() => onSelect(v)}
-                className="w-full flex items-center justify-between border border-[var(--color-border)] rounded-[12px] px-4 py-3 text-left hover:border-[var(--color-emerald-600)] hover:bg-[var(--color-emerald-50)] transition-colors"
-              >
-                <span className="text-sm font-medium text-[var(--color-ink-900)]">
-                  {Object.entries(v.optionValues)
-                    .map(([, val]) => val)
-                    .join(" / ")}
-                </span>
-                <span className="text-sm font-semibold text-[var(--color-emerald-700)]">
-                  ৳{v.priceOverride ?? product.basePrice}
-                </span>
-              </button>
-            ))}
-          {product.variants.filter((v) => v.isActive && v.stockCount > 0)
-            .length === 0 && (
-            <p className="text-sm text-[var(--color-ink-500)]">
-              Out of stock right now.
-            </p>
-          )}
-        </div>
-        <button
-          onClick={onClose}
-          className="mt-4 text-sm text-[var(--color-ink-500)] w-full text-center"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
