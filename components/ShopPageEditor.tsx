@@ -197,6 +197,7 @@ export default function ShopPageEditor({ org, token }: { org: Organization; toke
             value={form.bannerUrl}
             onChange={(url) => set("bannerUrl", url)}
             label="Banner (wide)"
+            aspect="wide"
             getUploadSignature={getUploadSignature}
           />
         </div>

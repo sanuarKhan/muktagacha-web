@@ -63,7 +63,8 @@ export default function ImageUploadField({
   }
 
   const sizeClass =
-    size === "sm" ? "w-20 h-20" : aspect === "square" ? "aspect-square max-w-[180px]" : "aspect-[16/9]";
+    size === "sm" ? "w-20 h-20" : aspect === "square" ? "w-[180px] max-w-full aspect-square" : "w-full aspect-[16/9]";
+  const pick = () => inputRef.current?.click();
 
   return (
     <div>
@@ -72,14 +73,13 @@ export default function ImageUploadField({
           {label}
         </label>
       )}
-      <div className="relative inline-block">
+      <div className={size === "sm" ? "relative inline-block" : "relative block"}>
         <button
           type="button"
-          onClick={() => inputRef.current?.click()}
+          onClick={pick}
           disabled={busy}
-          className={`relative overflow-hidden rounded-[14px] border-2 border-dashed border-[var(--color-border)] bg-[var(--color-cream-100)] hover:border-[var(--color-emerald-600)] transition-colors ${
-            size === "sm" ? sizeClass : `w-full ${sizeClass}`
-          } flex items-center justify-center`}
+          aria-label={value ? `Change ${label || "photo"}` : `Add ${label || "photo"}`}
+          className={`relative overflow-hidden rounded-[14px] border-2 border-dashed border-[var(--color-border)] bg-[var(--color-cream-100)] hover:border-[var(--color-emerald-600)] transition-colors ${sizeClass} flex items-center justify-center`}
         >
           {value ? (
             <Image
@@ -110,8 +110,13 @@ export default function ImageUploadField({
               )}
             </div>
           )}
+          {busy && value && (
+            <span className="absolute inset-0 bg-black/40 text-white text-xs font-medium flex items-center justify-center">
+              Uploading...
+            </span>
+          )}
         </button>
-        {onRemove && value && (
+        {size === "sm" && onRemove && value && (
           <button
             type="button"
             onClick={onRemove}
@@ -122,12 +127,36 @@ export default function ImageUploadField({
           </button>
         )}
       </div>
+      {size !== "sm" && value && (
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            onClick={pick}
+            disabled={busy}
+            className="text-xs font-medium px-3 py-1.5 rounded-full bg-[var(--color-emerald-50)] text-[var(--color-emerald-700)] hover:bg-[var(--color-emerald-100,#d9efe4)] disabled:opacity-50"
+          >
+            {busy ? "Uploading..." : "Change"}
+          </button>
+          <button
+            type="button"
+            onClick={() => (onRemove ? onRemove() : onChange(""))}
+            disabled={busy}
+            className="text-xs font-medium px-3 py-1.5 rounded-full bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50"
+          >
+            Remove
+          </button>
+        </div>
+      )}
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={(e) => handleFile(e.target.files?.[0])}
+        onChange={(e) => {
+          handleFile(e.target.files?.[0]);
+          // allow choosing the same file again after a change/remove
+          e.target.value = "";
+        }}
       />
       {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
     </div>
