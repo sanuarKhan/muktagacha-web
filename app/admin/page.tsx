@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AdminShopRow from "@/components/AdminShopRow";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
@@ -124,7 +125,9 @@ export default function AdminPage() {
 
   async function reject(id: string) {
     if (!token) return;
-    await api.patch(`/organizations/${id}/reject`, {}, token);
+    const note = window.prompt("Why is this shop being rejected? (the vendor sees this, fixes it and can send it again)");
+    if (note === null) return;
+    await api.patch(`/organizations/${id}/reject`, { note }, token);
     loadAll();
   }
 
@@ -285,25 +288,7 @@ export default function AdminPage() {
               <p className="text-[var(--color-ink-500)]">No vendors have signed up yet.</p>
             )}
             {allVendors.map((org: any) => (
-              <div key={org.id} className="bg-white rounded-[var(--radius-card)] shadow-card p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-[var(--color-ink-900)]">{org.name}</p>
-                  <p className="text-sm text-[var(--color-ink-500)]">
-                    {org.vertical} · {org._count?.listings ?? 0} product(s) · {org.owner?.phone}
-                  </p>
-                </div>
-                <span
-                  className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                    org.approvalStatus === "APPROVED"
-                      ? "bg-[var(--color-emerald-50)] text-[var(--color-emerald-700)]"
-                      : org.approvalStatus === "PENDING"
-                        ? "bg-[var(--color-gold-50)] text-[var(--color-gold-600)]"
-                        : "bg-red-50 text-red-600"
-                  }`}
-                >
-                  {org.approvalStatus}
-                </span>
-              </div>
+              <AdminShopRow key={org.id} shop={org} token={token!} onChanged={loadAll} />
             ))}
           </div>
         )}

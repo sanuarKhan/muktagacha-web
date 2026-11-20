@@ -36,6 +36,8 @@ export interface Organization {
   ward?: string | null;
   deliveryRadiusKm?: string | null;
   approvalStatus: ApprovalStatus;
+  // Admin's reason when the shop was rejected (shown to the vendor)
+  approvalNote?: string | null;
   createdAt: string;
   bkashNumber?: string | null;
   nagadNumber?: string | null;

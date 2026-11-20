@@ -197,8 +197,24 @@ const NAV_ITEMS: { id: Tab; label: string; icon: string }[] = [
   { id: "settings", label: "Settings", icon: "⚙" },
 ];
 
-function VendorDashboard({ org, token }: { org: Organization; token: string }) {
+function VendorDashboard({ org: initialOrg, token }: { org: Organization; token: string }) {
+  const [org, setOrg] = useState<Organization>(initialOrg);
+  const [resubmitting, setResubmitting] = useState(false);
+  const [resubmitError, setResubmitError] = useState("");
   const [tab, setTab] = useState<Tab>("home");
+
+  async function resubmit() {
+    setResubmitting(true);
+    setResubmitError("");
+    try {
+      const updated = await api.patch<Organization>(`/organizations/${org.id}/resubmit`, {}, token);
+      setOrg((o) => ({ ...o, approvalStatus: updated.approvalStatus, approvalNote: null }));
+    } catch (err: any) {
+      setResubmitError(err?.message || "Could not send. Please try again.");
+    } finally {
+      setResubmitting(false);
+    }
+  }
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [bookings, setBookings] = useState<ServiceRequest[]>([]);
@@ -281,6 +297,30 @@ function VendorDashboard({ org, token }: { org: Organization; token: string }) {
           Waiting for admin approval. You can still set everything up now —
           it'll appear to customers once approved.
         </p>
+      )}
+
+      {org.approvalStatus === "REJECTED" && (
+        <div className="rounded-[var(--radius-card)] border border-red-200 bg-red-50 px-4 py-3 mb-6">
+          <p className="font-semibold text-red-700">Your shop needs some changes before it can go live.</p>
+          {org.approvalNote ? (
+            <p className="text-sm text-red-700 mt-1">
+              <span className="font-medium">Admin's note:</span> {org.approvalNote}
+            </p>
+          ) : (
+            <p className="text-sm text-red-700 mt-1">Check your shop details, products and photos.</p>
+          )}
+          <p className="text-sm text-[var(--color-ink-700)] mt-2">
+            Fix it using the menu below, then send it for review again.
+          </p>
+          {resubmitError && <p className="text-sm text-red-700 mt-2">{resubmitError}</p>}
+          <button
+            onClick={resubmit}
+            disabled={resubmitting}
+            className="mt-3 bg-[var(--color-emerald-700)] text-white px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors disabled:opacity-50"
+          >
+            {resubmitting ? "Sending…" : "Send for review again"}
+          </button>
+        </div>
       )}
 
       {/* Dashboard shell: sidebar + content */}
