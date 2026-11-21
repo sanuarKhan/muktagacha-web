@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useCart } from "@/lib/cart-context";
 import VariantPickerModal from "@/components/VariantPickerModal";
 import MessageShopButton from "@/components/MessageShopButton";
+import { usesOptions, productSoldOut, productStockBadge } from "@/lib/stock";
 import type { Organization, Product } from "@/lib/types";
 
 const SITE_URL = "https://muktagacha.skodedigital.tech";
@@ -58,7 +59,8 @@ export default function ShopStorefront({
   }, [products, query, category, sort]);
 
   function add(product: Product) {
-    if (product.hasVariants && product.variants.length > 0) {
+    if (productSoldOut(product)) return;
+    if (usesOptions(product)) {
       setVariantPicker(product);
       return;
     }
@@ -233,7 +235,16 @@ export default function ShopStorefront({
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5 pb-24">
             {visible.map((p) => (
               <div key={p.id} className="bg-white rounded-[var(--radius-card)] shadow-card overflow-hidden flex flex-col">
-                <div className="relative aspect-square bg-[var(--color-cream-100)]">
+                <div className={`relative aspect-square bg-[var(--color-cream-100)] ${productSoldOut(p) ? "opacity-60" : ""}`}>
+                  {productStockBadge(p) && (
+                    <span
+                      className={`absolute top-2 left-2 z-10 text-[11px] font-semibold px-2 py-0.5 rounded-full shadow ${
+                        productSoldOut(p) ? "bg-[var(--color-ink-900)] text-white" : "bg-[var(--color-gold-500)] text-[var(--color-ink-900)]"
+                      }`}
+                    >
+                      {productStockBadge(p)}
+                    </span>
+                  )}
                   {p.images?.[0]?.url ? (
                     <Image src={p.images[0].url} alt={p.name} fill className="object-cover" unoptimized />
                   ) : (
@@ -245,13 +256,14 @@ export default function ShopStorefront({
                   {p.category?.name && <p className="text-xs text-[var(--color-ink-500)] mt-0.5">{p.category.name}</p>}
                   <div className="mt-auto pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <span className="font-semibold text-[var(--color-emerald-700)]">
-                      {p.hasVariants ? "From " : ""}৳{p.basePrice}
+                      {usesOptions(p) ? "From " : ""}৳{p.basePrice}
                     </span>
                     <button
                       onClick={() => add(p)}
-                      className="bg-[var(--color-emerald-700)] text-[var(--color-cream-50)] px-3 py-1.5 rounded-[var(--radius-pill)] text-xs sm:text-sm font-medium hover:bg-[var(--color-emerald-900)]"
+                      disabled={productSoldOut(p)}
+                      className="bg-[var(--color-emerald-700)] text-[var(--color-cream-50)] px-3 py-1.5 rounded-[var(--radius-pill)] text-xs sm:text-sm font-medium hover:bg-[var(--color-emerald-900)] disabled:bg-[var(--color-ink-300)] disabled:cursor-not-allowed"
                     >
-                      {p.hasVariants && p.variants.length > 0 ? "Options" : "Add to cart"}
+                      {productSoldOut(p) ? "Sold out" : usesOptions(p) ? "Options" : "Add to cart"}
                     </button>
                   </div>
                 </div>

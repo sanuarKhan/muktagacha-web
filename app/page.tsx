@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useCart } from "@/lib/cart-context";
 import CategoryStrip from "@/components/CategoryStrip";
 import VariantPickerModal from "@/components/VariantPickerModal";
+import { usesOptions, productSoldOut, productStockBadge } from "@/lib/stock";
 import FilterPanel, {
   EMPTY_FILTERS,
   applyFilters,
@@ -69,7 +70,8 @@ export default function HomePage() {
   }, [categoryId]);
 
   function handleAddToCart(product: Product) {
-    if (product.hasVariants && product.variants.length > 0) {
+    if (productSoldOut(product)) return;
+    if (usesOptions(product)) {
       setVariantPicker(product);
     } else {
       addItem(product, null);
@@ -220,7 +222,16 @@ export default function HomePage() {
               className="bg-white rounded-[var(--radius-card)] shadow-card hover:shadow-hover-card transition-shadow overflow-hidden flex flex-col"
             >
               {product.images?.[0]?.url && (
-                <div className="relative aspect-[4/3] bg-[var(--color-cream-100)]">
+                <div className={`relative aspect-[4/3] bg-[var(--color-cream-100)] ${productSoldOut(product) ? "opacity-60" : ""}`}>
+                  {productStockBadge(product) && (
+                    <span
+                      className={`absolute top-2 left-2 z-10 text-[11px] font-semibold px-2 py-0.5 rounded-full shadow ${
+                        productSoldOut(product) ? "bg-[var(--color-ink-900)] text-white" : "bg-[var(--color-gold-500)] text-[var(--color-ink-900)]"
+                      }`}
+                    >
+                      {productStockBadge(product)}
+                    </span>
+                  )}
                   <Image
                     src={product.images[0].url}
                     alt={product.name}
@@ -231,6 +242,11 @@ export default function HomePage() {
                 </div>
               )}
               <div className="p-5 flex flex-col flex-1">
+                {!product.images?.[0]?.url && productStockBadge(product) && (
+                  <span className={`self-start mb-2 text-[11px] font-semibold px-2 py-0.5 rounded-full ${productSoldOut(product) ? "bg-[var(--color-ink-900)] text-white" : "bg-[var(--color-gold-500)] text-[var(--color-ink-900)]"}`}>
+                    {productStockBadge(product)}
+                  </span>
+                )}
                 <button
                   onClick={() => product.organization && setShopModal(product.organization)}
                   className="text-xs text-[var(--color-ink-500)] mb-1.5 hover:text-[var(--color-emerald-700)] hover:underline text-left"
@@ -245,13 +261,14 @@ export default function HomePage() {
                 </p>
                 <div className="mt-auto flex items-center justify-between">
                   <span className="font-semibold text-[var(--color-emerald-700)] text-lg">
-                    {product.hasVariants ? "From " : ""}৳{product.basePrice}
+                    {usesOptions(product) ? "From " : ""}৳{product.basePrice}
                   </span>
                   <button
                     onClick={() => handleAddToCart(product)}
-                    className="bg-[var(--color-emerald-700)] text-[var(--color-cream-50)] px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors"
+                    disabled={productSoldOut(product)}
+                    className="bg-[var(--color-emerald-700)] text-[var(--color-cream-50)] px-4 py-2 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors disabled:bg-[var(--color-ink-300)] disabled:cursor-not-allowed"
                   >
-                    {product.hasVariants ? "Choose options" : "Add to cart"}
+                    {productSoldOut(product) ? "Sold out" : usesOptions(product) ? "Choose options" : "Add to cart"}
                   </button>
                 </div>
               </div>
