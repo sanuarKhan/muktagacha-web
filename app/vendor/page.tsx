@@ -203,6 +203,8 @@ function VendorDashboard({ org: initialOrg, token }: { org: Organization; token:
   const [resubmitting, setResubmitting] = useState(false);
   const [resubmitError, setResubmitError] = useState("");
   const [tab, setTab] = useState<Tab>("home");
+  // Shop page saved in Settings → refresh the header and Home card at once.
+  const onOrgSaved = (updated: Organization) => setOrg((o) => ({ ...o, ...updated }));
 
   async function resubmit() {
     setResubmitting(true);
@@ -372,6 +374,7 @@ function VendorDashboard({ org: initialOrg, token }: { org: Organization; token:
             <p className="text-sm text-[var(--color-ink-500)]">Loading...</p>
           ) : tab === "home" ? (
             <HomeTab
+              org={org}
               products={products}
               orders={orders}
               pendingOrders={pendingOrders}
@@ -396,7 +399,7 @@ function VendorDashboard({ org: initialOrg, token }: { org: Organization; token:
           ) : tab === "marketing" ? (
             <MarketingTab org={org} token={token} />
           ) : (
-            <SettingsTab org={org} token={token} />
+            <SettingsTab org={org} token={token} onOrgSaved={onOrgSaved} />
           )}
         </main>
       </div>
@@ -436,6 +439,7 @@ function StatCard({
 }
 
 function HomeTab({
+  org,
   products,
   orders,
   pendingOrders,
@@ -443,6 +447,7 @@ function HomeTab({
   totalRevenue,
   onGoTo,
 }: {
+  org: Organization;
   products: Product[];
   orders: Order[];
   pendingOrders: number;
@@ -456,6 +461,38 @@ function HomeTab({
 
   return (
     <div>
+      {/* Your shop — the obvious place to change name, logo, banner, details */}
+      <div className="bg-white rounded-[var(--radius-card)] shadow-card overflow-hidden mb-8">
+        <div className="relative h-28 sm:h-36 bg-gradient-to-r from-[var(--color-emerald-700)] to-[var(--color-emerald-900)]">
+          {org.bannerUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={org.bannerUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          )}
+        </div>
+        <div className="px-5 pb-5 -mt-8 flex flex-wrap items-end gap-4">
+          <div className="w-16 h-16 rounded-2xl ring-4 ring-white bg-[var(--color-emerald-50)] overflow-hidden flex items-center justify-center shrink-0">
+            {org.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={org.logoUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="font-display text-xl font-semibold text-[var(--color-emerald-700)]">{org.name[0]}</span>
+            )}
+          </div>
+          <div className="flex-1 min-w-[60%] sm:min-w-0 pt-9">
+            <p className="font-semibold text-[var(--color-ink-900)] truncate">{org.name}</p>
+            <p className="text-sm text-[var(--color-ink-500)] truncate">
+              {org.tagline || [org.area, org.ward].filter(Boolean).join(" · ") || "Add a tagline, logo and banner so customers trust your shop."}
+            </p>
+          </div>
+          <button
+            onClick={() => onGoTo("settings")}
+            className="w-full sm:w-auto px-4 py-2 rounded-[var(--radius-pill)] bg-[var(--color-emerald-700)] text-white text-sm font-medium hover:bg-[var(--color-emerald-900)]"
+          >
+            ✎ Edit shop — name, logo, banner, details
+          </button>
+        </div>
+      </div>
+
       <h2 className="font-display text-lg font-semibold text-[var(--color-ink-900)] mb-4">
         Overview
       </h2>
@@ -1911,7 +1948,15 @@ function MarketingTab({ org, token }: { org: Organization; token: string }) {
   );
 }
 
-function SettingsTab({ org, token }: { org: Organization; token: string }) {
+function SettingsTab({
+  org,
+  token,
+  onOrgSaved,
+}: {
+  org: Organization;
+  token: string;
+  onOrgSaved?: (org: Organization) => void;
+}) {
   const [section, setSection] = useState<SettingsSection>("profile");
 
   const [paymentNumbers, setPaymentNumbers] = useState({
@@ -2085,7 +2130,7 @@ function SettingsTab({ org, token }: { org: Organization; token: string }) {
         ))}
       </div>
 
-      {section === "profile" && <ShopPageEditor org={org} token={token} />}
+      {section === "profile" && <ShopPageEditor org={org} token={token} onSaved={onOrgSaved} />}
 
       {section === "account" && <VendorAccountSection org={org} token={token} />}
 

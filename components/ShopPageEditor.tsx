@@ -16,7 +16,15 @@ const label = "block text-sm font-medium text-[var(--color-ink-700)] mb-1.5";
  * Replaces the old read-only "Shop profile" panel, which told vendors to
  * contact admin support for any change — they can now brand it themselves.
  */
-export default function ShopPageEditor({ org, token }: { org: Organization; token: string }) {
+export default function ShopPageEditor({
+  org,
+  token,
+  onSaved,
+}: {
+  org: Organization;
+  token: string;
+  onSaved?: (org: Organization) => void;
+}) {
   const [saved, setSaved] = useState<Organization>(org);
   const [form, setForm] = useState({
     name: org.name ?? "",
@@ -27,6 +35,9 @@ export default function ShopPageEditor({ org, token }: { org: Organization; toke
     bannerUrl: org.bannerUrl ?? "",
     facebookUrl: org.facebookUrl ?? "",
     whatsappNumber: org.whatsappNumber ?? "",
+    area: org.area ?? "",
+    ward: org.ward ?? "",
+    deliveryRadiusKm: org.deliveryRadiusKm != null ? String(org.deliveryRadiusKm) : "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,12 +78,16 @@ export default function ShopPageEditor({ org, token }: { org: Organization; toke
           bannerUrl: form.bannerUrl || null,
           facebookUrl: form.facebookUrl || null,
           whatsappNumber: form.whatsappNumber || null,
+          area: form.area || null,
+          ward: form.ward || null,
+          deliveryRadiusKm: form.deliveryRadiusKm.trim() === "" ? null : Number(form.deliveryRadiusKm),
         },
         token,
       );
       setSaved({ ...saved, ...updated });
       setForm((f) => ({ ...f, slug: updated.slug ?? f.slug }));
       setNotice("Saved. Your shop page is updated.");
+      onSaved?.({ ...saved, ...updated });
     } catch (err) {
       const m = (err as { message?: string | string[] }).message;
       setError(Array.isArray(m) ? m[0] : m ?? "Could not save.");
@@ -204,6 +219,24 @@ export default function ShopPageEditor({ org, token }: { org: Organization; toke
         <p className="text-xs text-[var(--color-ink-500)] -mt-2">
           Banner looks best wide, around 1600 × 500. It also shows as the preview when your link is shared.
         </p>
+
+        <div>
+          <h4 className="text-sm font-semibold text-[var(--color-ink-900)] mb-2">Location & delivery</h4>
+          <div className="grid sm:grid-cols-3 gap-4">
+            <div>
+              <label className={label}>Area</label>
+              <input className={input} value={form.area} onChange={(e) => set("area", e.target.value)} placeholder="e.g. Muktagacha Bazar" maxLength={80} />
+            </div>
+            <div>
+              <label className={label}>Ward</label>
+              <input className={input} value={form.ward} onChange={(e) => set("ward", e.target.value)} placeholder="e.g. Ward 3" maxLength={80} />
+            </div>
+            <div>
+              <label className={label}>Delivery radius (km)</label>
+              <input className={input} inputMode="decimal" value={form.deliveryRadiusKm} onChange={(e) => set("deliveryRadiusKm", e.target.value)} placeholder="e.g. 5" />
+            </div>
+          </div>
+        </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
