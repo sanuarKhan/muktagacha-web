@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import type { Group, GroupTopic } from "@/lib/types";
 import ShareGroupButton from "@/components/ShareGroupButton";
+import GroupManagePanel from "@/components/GroupManagePanel";
 
 export default function GroupPageWrapper() {
   return (
@@ -18,7 +19,7 @@ export default function GroupPageWrapper() {
 
 function GroupPage() {
   const { groupId } = useParams<{ groupId: string }>();
-  const { token } = useAuth();
+  const { user, token } = useAuth();
   const [group, setGroup] = useState<Group | null>(null);
   const [topics, setTopics] = useState<GroupTopic[]>([]);
   const [joined, setJoined] = useState(false);
@@ -26,17 +27,28 @@ function GroupPage() {
   const [showTopicForm, setShowTopicForm] = useState(false);
   const [topicName, setTopicName] = useState("");
   const [justCreated, setJustCreated] = useState(false);
+  const [invite, setInvite] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
   useEffect(() => {
-    setJustCreated(new URLSearchParams(window.location.search).get("created") === "1");
+    const sp = new URLSearchParams(window.location.search);
+    setJustCreated(sp.get("created") === "1");
+    setInvite(sp.get("invite"));
   }, []);
 
   function loadGroup() {
     // Without a catch, any failure left `group` null and the page stuck on
     // its loading state forever with no explanation.
+    const inv = invite ?? (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("invite") : null);
     api
-      .get<Group>(`/groups/${groupId}`, token ?? undefined)
-      .then(setGroup)
-      .catch(() => setError("Couldn't load this group. Please refresh and try again."));
+      .get<Group>(`/groups/${groupId}${inv ? `?invite=${encodeURIComponent(inv)}` : ""}`, token ?? undefined)
+      .then((g) => {
+        setGroup(g);
+        setNotFound(false);
+      })
+      .catch((e: { statusCode?: number; status?: number }) => {
+        if (e?.statusCode === 404 || e?.status === 404) setNotFound(true);
+        else setError("Couldn't load this group. Please refresh and try again.");
+      });
   }
 
   function loadTopics() {
@@ -61,9 +73,13 @@ function GroupPage() {
       setError("Log in to join this group.");
       return;
     }
-    await api.post(`/groups/${groupId}/join`, {}, token);
-    loadTopics();
-    loadGroup();
+    try {
+      await api.post(`/groups/${groupId}/join`, invite ? { invite } : {}, token);
+      loadTopics();
+      loadGroup();
+    } catch (e: any) {
+      setError((Array.isArray(e?.message) ? e.message[0] : e?.message) || "Could not join");
+    }
   }
 
   async function handleCreateTopic() {
@@ -79,6 +95,17 @@ function GroupPage() {
     }
   }
 
+  if (notFound)
+    return (
+      <div className="max-w-3xl mx-auto px-5 sm:px-8 py-10">
+        <Link href="/community" className="text-sm text-[var(--color-ink-500)] mb-4 inline-block">← All groups</Link>
+        <h1 className="font-display text-2xl font-semibold text-[var(--color-ink-900)]">Group not available</h1>
+        <p className="text-[var(--color-ink-500)] mt-2">
+          This group doesn&apos;t exist, or it&apos;s a private group. Ask the group owner for an invite link
+          {!token ? " and log in first" : ""}.
+        </p>
+      </div>
+    );
   if (!group) return <div className="max-w-3xl mx-auto px-5 sm:px-8 py-10 text-[var(--color-ink-500)]">Loading…</div>;
 
   return (
@@ -88,11 +115,16 @@ function GroupPage() {
       </Link>
       <div className="flex items-start justify-between mb-2 gap-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-[var(--color-ink-900)]">{group.name}</h1>
+          <h1 className="font-display text-2xl font-semibold text-[var(--color-ink-900)] flex items-center gap-2 flex-wrap">
+            {group.name}
+            {group.isPrivate && (
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[var(--color-ink-900)] text-white"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true" className="inline -mt-0.5 mr-1"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Private</span>
+            )}
+          </h1>
           {group.description && <p className="text-[var(--color-ink-500)] mt-1">{group.description}</p>}
         </div>
         <div className="flex flex-wrap gap-2 shrink-0 justify-end">
-          <ShareGroupButton groupId={group.id} groupName={group.name} />
+          {!group.isPrivate && <ShareGroupButton groupId={group.id} groupName={group.name} />}
           {!joined && (
             <button
               onClick={handleJoin}
@@ -104,6 +136,22 @@ function GroupPage() {
         </div>
       </div>
       <p className="text-xs text-[var(--color-ink-500)] mb-2">{group._count?.members ?? 0} member{(group._count?.members ?? 0) === 1 ? "" : "s"}</p>
+      {(group.myRole === "OWNER" || group.myRole === "MODERATOR") && token && user && (
+        <GroupManagePanel
+          groupId={group.id}
+          groupName={group.name}
+          isPrivate={!!group.isPrivate}
+          myRole={group.myRole}
+          myUserId={user.id}
+          token={token}
+          onChanged={loadGroup}
+        />
+      )}
+      {invite && !joined && (
+        <p className="text-sm text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] rounded-lg px-3 py-2 my-3">
+          You&apos;ve been invited to this group. {token ? "Tap Join group." : "Log in, then tap Join group."}
+        </p>
+      )}
       {justCreated && (
         <p className="text-sm text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] rounded-lg px-3 py-2 mb-3">
           Your group is ready. Tap <b>Share group</b> to invite people on WhatsApp or Facebook.

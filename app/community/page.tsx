@@ -14,6 +14,7 @@ export default function CommunityPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [area, setArea] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [view, setView] = useState<"all" | "mine">("all");
@@ -51,7 +52,7 @@ export default function CommunityPage() {
     setSaving(true);
     setError(null);
     try {
-      const g = await api.post<Group>("/groups", { name: name.trim(), description: description.trim() || undefined, area: area.trim() || undefined }, token);
+      const g = await api.post<Group>("/groups", { name: name.trim(), description: description.trim() || undefined, area: area.trim() || undefined, isPrivate }, token);
       setName("");
       setDescription("");
       setArea("");
@@ -105,6 +106,22 @@ export default function CommunityPage() {
             placeholder="Area / Ward (optional)"
             className="w-full text-sm rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-2 outline-none focus:border-[var(--color-emerald-500)]"
           />
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { v: false, t: "Public", d: "Shown on Community. Anyone can join." },
+              { v: true, t: "Private", d: "Hidden. Only people with your invite link." },
+            ].map((o) => (
+              <button
+                key={o.t}
+                type="button"
+                onClick={() => setIsPrivate(o.v)}
+                className={`text-left rounded-xl border px-3 py-2 ${isPrivate === o.v ? "border-[var(--color-emerald-600)] bg-[var(--color-emerald-50)]" : "border-[var(--color-border)]"}`}
+              >
+                <span className="block text-sm font-medium text-[var(--color-ink-900)]">{o.t}</span>
+                <span className="block text-[11px] text-[var(--color-ink-500)]">{o.d}</span>
+              </button>
+            ))}
+          </div>
           {error && <p className="text-xs text-red-600">{error}</p>}
           <button
             onClick={handleCreate}
@@ -169,6 +186,7 @@ export default function CommunityPage() {
             >
               <h3 className="font-display font-semibold text-[var(--color-ink-900)] mb-1 flex items-center gap-2">
                 {g.name}
+                {g.isPrivate && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[var(--color-ink-900)] text-white"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true" className="inline -mt-0.5 mr-1"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Private</span>}
                 {g.myRole === "OWNER" && (
                   <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[var(--color-gold-50)] text-[var(--color-gold-600)]">Owner</span>
                 )}

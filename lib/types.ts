@@ -281,8 +281,9 @@ export interface Group {
   createdAt: string;
   _count?: { members: number; topics: number };
   topics?: GroupTopic[];
-  // only in "My groups"
-  myRole?: "OWNER" | "MODERATOR" | "MEMBER";
+  isPrivate?: boolean;
+  // set on "My groups" and on the group page (null = not a member)
+  myRole?: "OWNER" | "MODERATOR" | "MEMBER" | null;
 }
 
 export interface GroupTopic {
