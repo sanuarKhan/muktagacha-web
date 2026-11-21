@@ -30,7 +30,7 @@ export default function VariantPickerModal({
         </p>
         <div className="space-y-2 max-h-72 overflow-y-auto">
           {product.variants
-            .filter((v) => v.isActive && v.stockCount > 0)
+            .filter((v) => v.isActive && (v.stockCount === null || v.stockCount > 0))
             .map((v) => (
               <button
                 key={v.id}
@@ -47,7 +47,7 @@ export default function VariantPickerModal({
                 </span>
               </button>
             ))}
-          {product.variants.filter((v) => v.isActive && v.stockCount > 0)
+          {product.variants.filter((v) => v.isActive && (v.stockCount === null || v.stockCount > 0))
             .length === 0 && (
             <p className="text-sm text-[var(--color-ink-500)]">
               Out of stock right now.

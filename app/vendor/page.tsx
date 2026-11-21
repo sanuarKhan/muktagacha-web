@@ -723,6 +723,19 @@ function ProductForm({
 }) {
   const isEdit = !!product;
   const [hasVariants, setHasVariants] = useState(product?.hasVariants ?? false);
+  // Stock tracking is a clear choice, never "empty box = 0 = sold out".
+  // Off (default) = always available. On = vendor enters how many pieces.
+  const [trackStock, setTrackStock] = useState<boolean>(
+    product
+      ? product.hasVariants
+        ? (product.variants ?? []).some((v) => v.isActive && v.stockCount !== null)
+        : product.stockCount !== null && product.stockCount !== undefined
+      : false,
+  );
+  const [productStock, setProductStock] = useState<string>(
+    product?.stockCount !== null && product?.stockCount !== undefined ? String(product.stockCount) : "",
+  );
+  const [formError, setFormError] = useState("");
   const [images, setImages] = useState<string[]>(
     product?.images?.map((img) => img.url) ?? [],
   );
@@ -733,7 +746,7 @@ function ProductForm({
         id: v.id,
         size: v.optionValues?.size ?? "",
         color: v.optionValues?.color ?? "",
-        stockCount: String(v.stockCount ?? ""),
+        stockCount: v.stockCount === null || v.stockCount === undefined ? "" : String(v.stockCount),
         priceOverride: v.priceOverride ? String(v.priceOverride) : "",
       })) ?? [{ size: "", color: "", stockCount: "", priceOverride: "" }],
   );
@@ -777,6 +790,21 @@ function ProductForm({
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    setFormError("");
+    const realVariants = variants.filter((v) => v.size || v.color);
+    if (hasVariants && realVariants.length === 0) {
+      setFormError("Add at least one size or colour, or untick \"comes in different sizes or colours\".");
+      return;
+    }
+    if (trackStock) {
+      const bad = hasVariants
+        ? realVariants.some((v) => v.stockCount.trim() === "" || !(Number(v.stockCount) >= 0))
+        : productStock.trim() === "" || !(Number(productStock) >= 0);
+      if (bad) {
+        setFormError("Enter how many pieces you have (0 or more) — or untick \"Track stock\".");
+        return;
+      }
+    }
     setSaving(true);
     try {
       const builtVariants = hasVariants
@@ -788,7 +816,7 @@ function ProductForm({
                 ...(v.size ? { size: v.size } : {}),
                 ...(v.color ? { color: v.color } : {}),
               },
-              stockCount: Number(v.stockCount) || 0,
+              stockCount: trackStock ? Math.floor(Number(v.stockCount)) : null,
               priceOverride: v.priceOverride ? Number(v.priceOverride) : undefined,
             }))
         : [];
@@ -801,6 +829,7 @@ function ProductForm({
         description: form.description || undefined,
         basePrice: Number(form.basePrice),
         hasVariants,
+        stockCount: !hasVariants && trackStock ? Math.floor(Number(productStock)) : null,
         requiresPrescription: org.vertical === "PHARMACY" ? requiresPrescription : undefined,
         images: cleanImages,
         variants: builtVariants,
@@ -810,6 +839,8 @@ function ProductForm({
         ? await api.patch<Product>(`/products/${product!.id}`, payload, token)
         : await api.post<Product>("/products", payload, token);
       onSaved(saved);
+    } catch (err: any) {
+      setFormError((Array.isArray(err?.message) ? err.message[0] : err?.message) || "Could not save. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -939,6 +970,43 @@ function ProductForm({
           This product comes in different sizes or colors
         </label>
 
+        <div className="rounded-[12px] border border-[var(--color-border)] px-4 py-3 space-y-2">
+          <p className="text-sm font-medium text-[var(--color-ink-900)]">Stock</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {[
+              { v: false, t: "Always available", d: "Don't count pieces" },
+              { v: true, t: "Track stock", d: "Count pieces; shows Sold out at 0" },
+            ].map((o) => (
+              <button
+                key={o.t}
+                type="button"
+                onClick={() => setTrackStock(o.v)}
+                className={`text-left rounded-[10px] border px-3 py-2 ${trackStock === o.v ? "border-[var(--color-emerald-600)] bg-[var(--color-emerald-50)]" : "border-[var(--color-border)] bg-white"}`}
+              >
+                <span className="block text-sm font-medium text-[var(--color-ink-900)]">{o.t}</span>
+                <span className="block text-[11px] text-[var(--color-ink-500)]">{o.d}</span>
+              </button>
+            ))}
+          </div>
+          {trackStock && !hasVariants && (
+            <div>
+              <label className="block text-xs text-[var(--color-ink-500)] mb-1">How many pieces do you have?</label>
+              <input
+                type="number"
+                min={0}
+                inputMode="numeric"
+                placeholder="e.g. 10"
+                value={productStock}
+                onChange={(e) => setProductStock(e.target.value)}
+                className={`${inputClass} max-w-[10rem]`}
+              />
+            </div>
+          )}
+          {trackStock && hasVariants && (
+            <p className="text-[11px] text-[var(--color-ink-500)]">Enter the number of pieces for each size/colour below.</p>
+          )}
+        </div>
+
         {org.vertical === "PHARMACY" && (
           <label className="flex items-center gap-2.5 text-sm text-[var(--color-ink-700)] bg-[var(--color-gold-50)] rounded-[12px] px-4 py-3 cursor-pointer">
             <input
@@ -954,8 +1022,8 @@ function ProductForm({
         {hasVariants && (
           <div className="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-cream-100)]/60 p-4 space-y-3">
             <p className="text-xs text-[var(--color-ink-500)]">
-              Add each size/color combination you stock, with its own quantity.
-              Leave price blank to use the price above.
+              Add each size/colour you sell.{" "}
+              {trackStock ? "Enter how many pieces you have of each." : ""} Leave price blank to use the price above.
             </p>
             {variants.map((v, i) => (
               <div
@@ -974,13 +1042,18 @@ function ProductForm({
                   onChange={(e) => updateVariant(i, "color", e.target.value)}
                   className="w-24 border border-[var(--color-border)] rounded-[8px] px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]"
                 />
-                <input
-                  type="number"
-                  placeholder="Qty"
-                  value={v.stockCount}
-                  onChange={(e) => updateVariant(i, "stockCount", e.target.value)}
-                  className="w-20 border border-[var(--color-border)] rounded-[8px] px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]"
-                />
+                {trackStock && (
+                  <input
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    placeholder="Pieces"
+                    aria-label="Pieces in stock"
+                    value={v.stockCount}
+                    onChange={(e) => updateVariant(i, "stockCount", e.target.value)}
+                    className="w-20 border border-[var(--color-border)] rounded-[8px] px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]"
+                  />
+                )}
                 <input
                   type="number"
                   placeholder="৳ (opt.)"
@@ -1008,6 +1081,9 @@ function ProductForm({
         )}
       </div>
 
+      {formError && (
+        <p className="mt-5 text-sm text-red-700 bg-red-50 rounded-lg px-3 py-2">{formError}</p>
+      )}
       <div className="flex gap-3 mt-7 pt-5 border-t border-[var(--color-border)]">
         <button
           type="submit"

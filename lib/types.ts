@@ -95,7 +95,8 @@ export interface ProductVariant {
   sku?: string | null;
   optionValues: Record<string, string>;
   priceOverride?: string | null;
-  stockCount: number;
+  // null = stock not tracked (always available)
+  stockCount: number | null;
   isActive: boolean;
 }
 
@@ -109,6 +110,8 @@ export interface Product {
   description?: string | null;
   basePrice: string;
   hasVariants: boolean;
+  // products without options; null = not tracked (always available)
+  stockCount?: number | null;
   requiresPrescription?: boolean;
   images: ProductImage[];
   variants: ProductVariant[];
