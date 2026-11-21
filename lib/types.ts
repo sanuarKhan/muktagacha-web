@@ -281,6 +281,8 @@ export interface Group {
   createdAt: string;
   _count?: { members: number; topics: number };
   topics?: GroupTopic[];
+  // only in "My groups"
+  myRole?: "OWNER" | "MODERATOR" | "MEMBER";
 }
 
 export interface GroupTopic {

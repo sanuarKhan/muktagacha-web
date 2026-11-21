@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import type { Group, GroupTopic } from "@/lib/types";
+import ShareGroupButton from "@/components/ShareGroupButton";
 
 export default function GroupPageWrapper() {
   return (
@@ -24,6 +25,10 @@ function GroupPage() {
   const [error, setError] = useState<string | null>(null);
   const [showTopicForm, setShowTopicForm] = useState(false);
   const [topicName, setTopicName] = useState("");
+  const [justCreated, setJustCreated] = useState(false);
+  useEffect(() => {
+    setJustCreated(new URLSearchParams(window.location.search).get("created") === "1");
+  }, []);
 
   function loadGroup() {
     // Without a catch, any failure left `group` null and the page stuck on
@@ -86,15 +91,24 @@ function GroupPage() {
           <h1 className="font-display text-2xl font-semibold text-[var(--color-ink-900)]">{group.name}</h1>
           {group.description && <p className="text-[var(--color-ink-500)] mt-1">{group.description}</p>}
         </div>
-        {!joined && (
-          <button
-            onClick={handleJoin}
-            className="shrink-0 text-sm font-medium bg-[var(--color-emerald-700)] text-white px-4 py-2 rounded-[var(--radius-pill)]"
-          >
-            Join group
-          </button>
-        )}
+        <div className="flex flex-wrap gap-2 shrink-0 justify-end">
+          <ShareGroupButton groupId={group.id} groupName={group.name} />
+          {!joined && (
+            <button
+              onClick={handleJoin}
+              className="text-sm font-medium bg-[var(--color-emerald-700)] text-white px-4 py-2 rounded-[var(--radius-pill)]"
+            >
+              Join group
+            </button>
+          )}
+        </div>
       </div>
+      <p className="text-xs text-[var(--color-ink-500)] mb-2">{group._count?.members ?? 0} member{(group._count?.members ?? 0) === 1 ? "" : "s"}</p>
+      {justCreated && (
+        <p className="text-sm text-[var(--color-emerald-700)] bg-[var(--color-emerald-50)] rounded-lg px-3 py-2 mb-3">
+          Your group is ready. Tap <b>Share group</b> to invite people on WhatsApp or Facebook.
+        </p>
+      )}
       {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
 
       {!joined ? (
