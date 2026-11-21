@@ -26,6 +26,7 @@ function GroupPage() {
   const [error, setError] = useState<string | null>(null);
   const [showTopicForm, setShowTopicForm] = useState(false);
   const [topicName, setTopicName] = useState("");
+  const [topicOwnerOnly, setTopicOwnerOnly] = useState(false);
   const [justCreated, setJustCreated] = useState(false);
   const [invite, setInvite] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -85,8 +86,9 @@ function GroupPage() {
   async function handleCreateTopic() {
     if (!topicName.trim() || !token) return;
     try {
-      await api.post(`/groups/${groupId}/topics`, { name: topicName.trim() }, token);
+      await api.post(`/groups/${groupId}/topics`, { name: topicName.trim(), ownerPostsOnly: topicOwnerOnly }, token);
       setTopicName("");
+      setTopicOwnerOnly(false);
       setShowTopicForm(false);
       loadTopics();
     } catch (err) {
@@ -192,6 +194,12 @@ function GroupPage() {
               </button>
             </div>
           )}
+          {showTopicForm && (group.myRole === "OWNER" || group.myRole === "MODERATOR") && (
+            <label className="flex items-center gap-2 text-xs text-[var(--color-ink-500)] -mt-2 mb-4 cursor-pointer">
+              <input type="checkbox" checked={topicOwnerOnly} onChange={(e) => setTopicOwnerOnly(e.target.checked)} className="w-3.5 h-3.5" />
+              Announcements topic — only owner &amp; moderators can post (good for lessons)
+            </label>
+          )}
           <div className="space-y-2">
             {topics.map((t) => (
               <Link
@@ -200,6 +208,9 @@ function GroupPage() {
                 className="block bg-white rounded-[var(--radius-sm)] shadow-card hover:shadow-hover-card transition-shadow px-4 py-3"
               >
                 <span className="font-medium text-[var(--color-ink-900)]"># {t.name}</span>
+                {t.ownerPostsOnly && (
+                  <span className="text-[10px] font-medium ml-2 px-2 py-0.5 rounded-full bg-[var(--color-gold-50)] text-[var(--color-gold-600)]">Announcements</span>
+                )}
                 <span className="text-xs text-[var(--color-ink-500)] ml-2">
                   {t._count?.posts ?? 0} posts
                 </span>

@@ -86,3 +86,22 @@ export async function uploadToCloudinary(
   const data = await res.json();
   return data.secure_url as string;
 }
+
+// PDFs (and other documents) go up as Cloudinary "raw" files. Returns the
+// storage id — the server hands members a short-lived download link later.
+export async function uploadRawToCloudinary(
+  file: File,
+  getSignature: () => Promise<UploadSignature>,
+): Promise<{ publicId: string }> {
+  const sig = await getSignature();
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+  formData.append("api_key", sig.apiKey);
+  formData.append("timestamp", String(sig.timestamp));
+  formData.append("signature", sig.signature);
+  formData.append("folder", sig.folder);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/raw/upload`, { method: "POST", body: formData });
+  if (!res.ok) throw new Error(`Upload failed: ${await res.text()}`);
+  const data = await res.json();
+  return { publicId: data.public_id as string };
+}

@@ -293,6 +293,7 @@ export interface GroupTopic {
   creatorId: string;
   creator?: ChatUser;
   createdAt: string;
+  ownerPostsOnly?: boolean;
   _count?: { posts: number };
 }
 
@@ -303,6 +304,9 @@ export interface GroupPost {
   author?: ChatUser;
   body: string;
   isAnonymous?: boolean;
+  attachmentKind?: "IMAGE" | "PDF" | null;
+  attachmentRef?: string | null;
+  attachmentName?: string | null;
   createdAt: string;
 }
 
