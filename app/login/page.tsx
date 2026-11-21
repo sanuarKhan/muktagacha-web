@@ -20,7 +20,10 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(phone, password);
-      router.push("/");
+      // Back to where they were (e.g. a shop page after "Message shop").
+      // Only same-site paths — never an external URL.
+      const next = new URLSearchParams(window.location.search).get("next");
+      router.push(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
     } catch (err: any) {
       setError(
         typeof err?.message === "string"

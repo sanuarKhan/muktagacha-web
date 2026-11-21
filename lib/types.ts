@@ -238,6 +238,8 @@ export interface Conversation {
   organization?: { id: string; name: string; logoUrl?: string | null };
   buyerId: string;
   buyer?: ChatUser;
+  // which side I am on: "customer" (I messaged the shop) or "shop" (I own it)
+  side?: "customer" | "shop";
   messages?: Message[];
   createdAt: string;
   updatedAt: string;

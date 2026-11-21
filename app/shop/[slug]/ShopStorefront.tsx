@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/lib/cart-context";
 import VariantPickerModal from "@/components/VariantPickerModal";
+import MessageShopButton from "@/components/MessageShopButton";
 import type { Organization, Product } from "@/lib/types";
 
 const SITE_URL = "https://muktagacha.skodedigital.tech";
@@ -135,6 +136,11 @@ export default function ShopStorefront({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <MessageShopButton
+              shopId={shop.id}
+              shopName={shop.name}
+              className="px-4 py-2 rounded-[var(--radius-pill)] bg-[var(--color-emerald-700)] text-white text-sm font-medium hover:bg-[var(--color-emerald-900)]"
+            />
             {shop.whatsappNumber && (
               <a
                 href={waLink(shop.whatsappNumber, `Hi ${shop.name}, I found your shop on Muktagacha.`)}

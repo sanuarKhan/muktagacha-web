@@ -330,10 +330,6 @@ function ShopInfoModal({ org, onClose }: { org: Organization; onClose: () => voi
       setMessageError("Log in to message this shop.");
       return;
     }
-    if (user.role !== "BUYER") {
-      setMessageError("Only buyer accounts can message a shop directly.");
-      return;
-    }
     if (!firstMessage.trim()) return;
     try {
       await api.post("/chat/conversations", { organizationId: org.id, body: firstMessage.trim() }, token);

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useChatSocket } from "@/lib/use-chat-socket";
 import { api } from "@/lib/api";
+import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
 import type { Conversation, Message } from "@/lib/types";
 
 type DirectConversation = {
@@ -82,7 +83,7 @@ export default function ChatWidget() {
       socket.emit(joinEvent, { conversationId: activeId });
       const handler = (msg: Message) => {
         if (msg.conversationId === activeId) {
-          setMessages((prev) => [...prev, msg]);
+          setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
         }
         loadConversations();
       };
@@ -99,6 +100,22 @@ export default function ChatWidget() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // "Message shop" buttons elsewhere open the box (and the new chat).
+  useEffect(() => {
+    function onOpen(e: Event) {
+      const d = (e as CustomEvent<{ tab?: Tab; conversationId?: string }>).detail ?? {};
+      setOpen(true);
+      if (d.tab) setTab(d.tab);
+      if (d.conversationId) {
+        loadConversations();
+        setActiveId(d.conversationId);
+      }
+    }
+    window.addEventListener(OPEN_CHAT_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_CHAT_EVENT, onOpen);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   async function handleSend() {
     if (!draft.trim() || !activeId || !token) return;
     const base = isDirect ? "/direct-messages" : "/chat";
@@ -106,7 +123,7 @@ export default function ChatWidget() {
     setDraft("");
     try {
       const msg = await api.post<Message>(`${base}/conversations/${activeId}/messages`, { body }, token);
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => (prev.some((x) => x.id === msg.id) ? prev : [...prev, msg]));
     } catch {
       setDraft(body);
     }
@@ -179,8 +196,8 @@ export default function ChatWidget() {
                 <span className="truncate max-w-[12rem]">
                   {isDirect
                     ? directPeerName(activeDirectConvo)
-                    : user.role === "VENDOR"
-                      ? activeShopConvo?.buyer?.fullName
+                    : activeShopConvo?.side === "shop"
+                      ? `${activeShopConvo?.buyer?.fullName ?? "Customer"} · ${activeShopConvo?.organization?.name ?? ""}`
                       : activeShopConvo?.organization?.name}
                 </span>
               </button>
@@ -297,7 +314,7 @@ function ConversationList({
   if (conversations.length === 0) {
     return (
       <p className="text-center text-xs text-[var(--color-ink-500)] mt-8 px-4">
-        No conversations yet. Visit a shop page and tap &quot;Message shop&quot; to start one.
+        No chats yet. Open any shop and tap &quot;Message shop&quot;. Customers who message your shop appear here too.
       </p>
     );
   }
@@ -314,8 +331,11 @@ function ConversationList({
           >
             <div className="min-w-0">
               <p className="text-sm font-medium text-[var(--color-ink-900)] truncate">
-                {c.organization?.name ?? c.buyer?.fullName ?? "Conversation"}
+                {c.side === "shop" ? (c.buyer?.fullName ?? "Customer") : (c.organization?.name ?? "Shop")}
               </p>
+              {c.side === "shop" && (
+                <p className="text-[10px] uppercase tracking-wide text-[var(--color-emerald-700)]">Customer · {c.organization?.name}</p>
+              )}
               {last && (
                 <p className="text-xs text-[var(--color-ink-500)] truncate">{last.body}</p>
               )}
