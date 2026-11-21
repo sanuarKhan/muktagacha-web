@@ -93,11 +93,10 @@ export default function AdminShopRow({ shop, token, onChanged }: { shop: Shop; t
   }
 
   function remove() {
-    if (history > 0) {
-      setError(`This shop has ${history} order(s)/booking(s)/review(s), so it can't be deleted. Reject it instead — it will be hidden from the website.`);
-      return;
-    }
-    const typed = window.prompt(`Delete "${shop.name}" and its ${c.listings ?? 0} product(s) permanently?\nType DELETE to confirm.`);
+    const msg = history > 0
+      ? `"${shop.name}" has ${history} order(s)/booking(s)/review(s). Those records are kept, so the shop will be HIDDEN from the website (not erased).\nThe owner's account is not affected — use Users to delete the account.\n\nType DELETE to confirm.`
+      : `Delete "${shop.name}" and its ${c.listings ?? 0} product(s) permanently?\nThe owner's account is not affected — use Users to delete the account.\n\nType DELETE to confirm.`;
+    const typed = window.prompt(msg);
     if (typed !== "DELETE") return;
     run(() => api.delete(`/organizations/${shop.id}`, token));
   }

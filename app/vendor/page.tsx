@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import ImageUploadField from "@/components/ImageUploadField";
 import VendorSmsPhone from "@/components/VendorSmsPhone";
 import ShopPageEditor from "@/components/ShopPageEditor";
+import DeleteAccountDialog from "@/components/DeleteAccountDialog";
 
 // Leaflet touches window/document, so it must be loaded client-side
 // only - dynamic() with ssr:false is the standard Next.js fix.
@@ -1616,7 +1617,7 @@ function OrdersTab({
   );
 }
 
-type SettingsSection = "profile" | "payment" | "images" | "skodepay" | "location" | "verification";
+type SettingsSection = "profile" | "payment" | "images" | "skodepay" | "location" | "verification" | "account";
 
 function MarketingTab({ org, token }: { org: Organization; token: string }) {
   const [contacts, setContacts] = useState<MarketingContact[]>([]);
@@ -2059,6 +2060,7 @@ function SettingsTab({ org, token }: { org: Organization; token: string }) {
     { id: "skodepay", label: "SkodePay" },
     { id: "location", label: "Location" },
     { id: "verification", label: "Verification" },
+    { id: "account", label: "Account" },
   ];
 
   return (
@@ -2084,6 +2086,8 @@ function SettingsTab({ org, token }: { org: Organization; token: string }) {
       </div>
 
       {section === "profile" && <ShopPageEditor org={org} token={token} />}
+
+      {section === "account" && <VendorAccountSection org={org} token={token} />}
 
       {section === "payment" && (
         <form
@@ -2363,6 +2367,66 @@ function SettingsTab({ org, token }: { org: Organization; token: string }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Settings → Account: close the shop, or delete the whole account.
+function VendorAccountSection({ org, token }: { org: Organization; token: string }) {
+  const { logout } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function deleteShop() {
+    const typed = window.prompt(
+      `Delete the shop "${org.name}"?\nIf it has orders, bookings or reviews it will be hidden instead (records are kept).\nYour account stays — you can open a new shop later.\n\nType DELETE to confirm.`,
+    );
+    if (typed !== "DELETE") return;
+    setBusy(true);
+    setMsg("");
+    try {
+      const r = await api.delete<{ mode: "deleted" | "hidden" }>(`/organizations/${org.id}`, token);
+      setMsg(r.mode === "deleted" ? "Shop deleted." : "Shop hidden from the website. Your orders are kept.");
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (e: any) {
+      setMsg(e?.message || "Could not delete the shop.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4 max-w-xl">
+      <div className="bg-white rounded-[var(--radius-card)] shadow-card p-5">
+        <h3 className="font-semibold text-[var(--color-ink-900)]">Delete this shop</h3>
+        <p className="text-sm text-[var(--color-ink-500)] mt-1">
+          Removes the shop and its products. Your account stays, so you can open a new shop later.
+        </p>
+        <button
+          onClick={deleteShop}
+          disabled={busy}
+          className="mt-3 text-sm px-3 py-1.5 rounded-[var(--radius-pill)] bg-red-50 text-red-700 font-medium hover:bg-red-100 disabled:opacity-50"
+        >
+          {busy ? "Deleting…" : "Delete shop"}
+        </button>
+        {msg && <p className="text-sm mt-2 text-[var(--color-ink-700)]">{msg}</p>}
+      </div>
+      <div className="bg-white rounded-[var(--radius-card)] shadow-card p-5 border border-red-100">
+        <h3 className="font-semibold text-red-700">Delete my account</h3>
+        <p className="text-sm text-[var(--color-ink-500)] mt-1">
+          Deletes your account and shop. Your phone number becomes free to sign up again.
+        </p>
+        <div className="mt-3">
+          <DeleteAccountDialog
+            mode="self"
+            token={token}
+            onDone={() => {
+              logout();
+              window.location.href = "/";
+            }}
+          />
+        </div>
+      </div>
     </div>
   );
 }

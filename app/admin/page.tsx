@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AdminShopRow from "@/components/AdminShopRow";
+import AdminUsersTab from "@/components/AdminUsersTab";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
@@ -31,7 +32,7 @@ interface FraudFlag {
   order: Order & { buyer?: { fullName: string; phone: string; createdAt: string } };
 }
 
-type Tab = "pending" | "vendors" | "catalog" | "categories" | "orders" | "riders" | "fraud" | "verification" | "wallet" | "escrow";
+type Tab = "pending" | "vendors" | "users" | "catalog" | "categories" | "orders" | "riders" | "fraud" | "verification" | "wallet" | "escrow";
 
 const inputClass =
   "border border-[var(--color-border)] rounded-[10px] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-emerald-600)]";
@@ -246,6 +247,7 @@ export default function AdminPage() {
         <div className="flex gap-2 mb-6 border-b border-[var(--color-border)] overflow-x-auto">
           <TabButton active={tab === "pending"} onClick={() => setTab("pending")} label={`Pending approval (${pending.length})`} />
           <TabButton active={tab === "vendors"} onClick={() => setTab("vendors")} label={`All vendors (${allVendors.length})`} />
+          <TabButton active={tab === "users"} onClick={() => setTab("users")} label="Users" />
           <TabButton active={tab === "catalog"} onClick={() => setTab("catalog")} label={`Product catalog (${catalog.length})`} />
           <TabButton active={tab === "orders"} onClick={() => setTab("orders")} label={`Orders (${orders.length})`} />
           <TabButton active={tab === "categories"} onClick={() => setTab("categories")} label={`Categories (${categories.length})`} />
@@ -281,6 +283,8 @@ export default function AdminPage() {
             ))}
           </div>
         )}
+
+        {tab === "users" && token && <AdminUsersTab token={token} onChanged={loadAll} />}
 
         {tab === "vendors" && (
           <div className="space-y-2">
