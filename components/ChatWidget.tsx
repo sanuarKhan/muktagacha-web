@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useChatSocket } from "@/lib/use-chat-socket";
 import { api } from "@/lib/api";
 import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
+import NewChatPanel from "@/components/NewChatPanel";
 import type { Conversation, Message } from "@/lib/types";
 
 type DirectConversation = {
@@ -34,6 +35,7 @@ export default function ChatWidget() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
+  const [composing, setComposing] = useState(false); // "New chat" search
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const isDirect = tab === "people";
@@ -105,6 +107,7 @@ export default function ChatWidget() {
     function onOpen(e: Event) {
       const d = (e as CustomEvent<{ tab?: Tab; conversationId?: string }>).detail ?? {};
       setOpen(true);
+      setComposing(false);
       if (d.tab) setTab(d.tab);
       if (d.conversationId) {
         loadConversations();
@@ -202,7 +205,17 @@ export default function ChatWidget() {
                 </span>
               </button>
             ) : (
-              <span className="text-[var(--color-cream-50)] font-semibold text-sm">Messages</span>
+              <span className="flex items-center gap-2">
+                <span className="text-[var(--color-cream-50)] font-semibold text-sm">Messages</span>
+                {!composing && token && (
+                  <button
+                    onClick={() => setComposing(true)}
+                    className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-white/20 text-[var(--color-cream-50)] hover:bg-white/30"
+                  >
+                    + New chat
+                  </button>
+                )}
+              </span>
             )}
             <button onClick={() => setOpen(false)} className="text-[var(--color-cream-50)]/70 hover:text-[var(--color-cream-50)]">
               ✕
@@ -210,7 +223,7 @@ export default function ChatWidget() {
           </div>
 
           {/* Tabs (hidden once a thread is open) */}
-          {!activeId && (
+          {!activeId && !composing && (
             <div className="flex px-2 pt-2 gap-1">
               {(["shops", "people"] as Tab[]).map((t) => (
                 <button
@@ -228,7 +241,18 @@ export default function ChatWidget() {
 
           {/* Body */}
           <div className="flex-1 overflow-y-auto">
-            {!activeId ? (
+            {!activeId && composing && token ? (
+              <NewChatPanel
+                token={token}
+                onClose={() => setComposing(false)}
+                onStarted={(kind, id) => {
+                  setComposing(false);
+                  setTab(kind);
+                  loadConversations();
+                  setActiveId(id);
+                }}
+              />
+            ) : !activeId ? (
               isDirect ? (
                 <DirectConversationList
                   conversations={directConvos}
@@ -314,7 +338,7 @@ function ConversationList({
   if (conversations.length === 0) {
     return (
       <p className="text-center text-xs text-[var(--color-ink-500)] mt-8 px-4">
-        No chats yet. Open any shop and tap &quot;Message shop&quot;. Customers who message your shop appear here too.
+        No chats yet. Tap &quot;+ New chat&quot; above, or &quot;Message shop&quot; on any shop page. Customers who message your shop appear here too.
       </p>
     );
   }
@@ -360,7 +384,7 @@ function DirectConversationList({
   if (conversations.length === 0) {
     return (
       <p className="text-center text-xs text-[var(--color-ink-500)] mt-8 px-4">
-        No conversations yet. Message someone from the Community page to start one.
+        No conversations yet. Tap &quot;+ New chat&quot; above to find people from your community groups.
       </p>
     );
   }
