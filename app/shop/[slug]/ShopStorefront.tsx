@@ -31,7 +31,7 @@ export default function ShopStorefront({
   const [sort, setSort] = useState<"new" | "low" | "high">("new");
   const [variantPicker, setVariantPicker] = useState<Product | null>(null);
   const [copied, setCopied] = useState(false);
-  const [added, setAdded] = useState<string | null>(null);
+  const [added, setAdded] = useState<{ text: string; warn: boolean } | null>(null);
 
   const shopUrl = `${SITE_URL}/shop/${shop.slug || shop.id}`;
   const cartCount = lines.reduce((n, l) => n + l.quantity, 0);
@@ -64,13 +64,14 @@ export default function ShopStorefront({
       setVariantPicker(product);
       return;
     }
-    addItem(product, null);
-    flashAdded(product.name);
+    const r = addItem(product, null);
+    if (r.ok) flashAdded(product.name);
+    else flashAdded(`${product.name}: only ${r.max} available — already in your cart`, true);
   }
 
-  function flashAdded(name: string) {
-    setAdded(name);
-    setTimeout(() => setAdded(null), 2200);
+  function flashAdded(text: string, warn = false) {
+    setAdded({ text, warn });
+    setTimeout(() => setAdded(null), warn ? 3200 : 2200);
   }
 
   async function share() {
@@ -275,8 +276,13 @@ export default function ShopStorefront({
 
       {/* Floating cart + "added" toast — keeps buyers in the shop's page */}
       {added && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 bg-[var(--color-ink-900)] text-white text-sm px-4 py-2 rounded-full shadow-elevated">
-          Added “{added}”
+        <div
+          role="status"
+          className={`fixed bottom-20 left-1/2 -translate-x-1/2 z-40 text-sm px-4 py-2 rounded-full shadow-elevated max-w-[90vw] text-center ${
+            added.warn ? "bg-[var(--color-gold-500)] text-[var(--color-ink-900)]" : "bg-[var(--color-ink-900)] text-white"
+          }`}
+        >
+          {added.warn ? added.text : `Added “${added.text}”`}
         </div>
       )}
       {cartCount > 0 && (
@@ -284,7 +290,7 @@ export default function ShopStorefront({
           href="/checkout"
           className="fixed bottom-5 right-5 z-40 bg-[var(--color-emerald-700)] text-white px-5 py-3 rounded-full shadow-elevated font-medium hover:bg-[var(--color-emerald-900)]"
         >
-          🛒 Checkout ({cartCount})
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="inline -mt-0.5 mr-1"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 7H6"/></svg>Cart ({cartCount})
         </Link>
       )}
 
@@ -300,8 +306,9 @@ export default function ShopStorefront({
           product={variantPicker}
           onClose={() => setVariantPicker(null)}
           onSelect={(variant) => {
-            addItem(variantPicker, variant);
-            flashAdded(variantPicker.name);
+            const r = addItem(variantPicker, variant);
+            if (r.ok) flashAdded(variantPicker.name);
+            else flashAdded(`${variantPicker.name}: only ${r.max} available — already in your cart`, true);
             setVariantPicker(null);
           }}
         />

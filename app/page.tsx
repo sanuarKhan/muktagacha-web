@@ -35,6 +35,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { addItem, lines } = useCart();
+  const [toast, setToast] = useState<{ text: string; warn: boolean } | null>(null);
   const [variantPicker, setVariantPicker] = useState<Product | null>(null);
   const [shopModal, setShopModal] = useState<Organization | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -74,8 +75,14 @@ export default function HomePage() {
     if (usesOptions(product)) {
       setVariantPicker(product);
     } else {
-      addItem(product, null);
+      const r = addItem(product, null);
+      flash(r.ok ? `Added “${product.name}”` : `${product.name}: only ${r.max} available — already in your cart`, !r.ok);
     }
+  }
+
+  function flash(text: string, warn = false) {
+    setToast({ text, warn });
+    setTimeout(() => setToast(null), warn ? 3200 : 2200);
   }
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
@@ -172,7 +179,7 @@ export default function HomePage() {
                 href="/checkout"
                 className="bg-[var(--color-emerald-700)] text-[var(--color-cream-50)] px-4 py-2.5 rounded-[var(--radius-pill)] text-sm font-medium hover:bg-[var(--color-emerald-900)] transition-colors shadow-card"
               >
-                Cart ({lines.reduce((n, l) => n + l.quantity, 0)})
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="inline -mt-0.5 mr-1"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 7H6"/></svg>Cart ({lines.reduce((n, l) => n + l.quantity, 0)})
               </Link>
             )}
           </div>
@@ -310,7 +317,8 @@ export default function HomePage() {
           product={variantPicker}
           onClose={() => setVariantPicker(null)}
           onSelect={(variant) => {
-            addItem(variantPicker, variant);
+            const r = addItem(variantPicker, variant);
+            flash(r.ok ? `Added “${variantPicker.name}”` : `${variantPicker.name}: only ${r.max} available — already in your cart`, !r.ok);
             setVariantPicker(null);
           }}
         />
@@ -318,6 +326,17 @@ export default function HomePage() {
 
       {shopModal && (
         <ShopInfoModal org={shopModal} onClose={() => setShopModal(null)} />
+      )}
+
+      {toast && (
+        <div
+          role="status"
+          className={`fixed bottom-20 left-1/2 -translate-x-1/2 z-40 text-sm px-4 py-2 rounded-full shadow-elevated max-w-[90vw] text-center ${
+            toast.warn ? "bg-[var(--color-gold-500)] text-[var(--color-ink-900)]" : "bg-[var(--color-ink-900)] text-white"
+          }`}
+        >
+          {toast.text}
+        </div>
       )}
 
       {/* Options are derived from `products` (the category-level result set),

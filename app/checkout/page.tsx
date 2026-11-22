@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useCart } from "@/lib/cart-context";
+import Link from "next/link";
+import { useCart, maxQuantity } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import type { Order, PaymentMethod, Organization } from "@/lib/types";
@@ -18,7 +19,7 @@ const LocationPicker = dynamic(() => import("@/components/LocationPicker"), {
 });
 
 export default function CheckoutPage() {
-  const { lines, linesByOrganization, clear } = useCart();
+  const { lines, linesByOrganization, clear, setQuantity, removeItem } = useCart();
   const { user, token } = useAuth();
   const router = useRouter();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
@@ -204,8 +205,12 @@ export default function CheckoutPage() {
 
   if (lines.length === 0) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-[var(--color-cream-100)]">
-        <p className="text-[var(--color-ink-500)]">Your cart is empty.</p>
+      <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center gap-3 bg-[var(--color-cream-100)] px-5 text-center">
+        <p className="font-display text-xl font-semibold text-[var(--color-ink-900)]">Your cart is empty</p>
+        <p className="text-sm text-[var(--color-ink-500)]">Browse local shops and add something you like.</p>
+        <Link href="/" className="mt-1 bg-[var(--color-emerald-700)] text-white text-sm font-medium px-5 py-2.5 rounded-full hover:bg-[var(--color-emerald-900)]">
+          Continue shopping
+        </Link>
       </div>
     );
   }
@@ -213,7 +218,10 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[var(--color-cream-100)] px-5 py-10">
       <div className="max-w-2xl mx-auto">
-      <h1 className="font-display text-2xl font-semibold text-[var(--color-ink-900)] mb-6">Checkout</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="font-display text-2xl font-semibold text-[var(--color-ink-900)]">Checkout</h1>
+        <Link href="/" className="text-sm text-[var(--color-emerald-700)] font-medium hover:underline">+ Add more items</Link>
+      </div>
 
       {Object.entries(grouped).map(([orgId, groupLines]) => (
         <div
@@ -223,22 +231,66 @@ export default function CheckoutPage() {
           <h3 className="font-semibold text-sm text-[var(--color-ink-500)] mb-2">
             {groupLines[0].product.organization?.name ?? "Vendor"}
           </h3>
-          {groupLines.map((l) => (
-            <div
-              key={`${l.product.id}:${l.variant?.id ?? ""}`}
-              className="flex justify-between text-sm py-1 text-[var(--color-ink-700)]"
-            >
-              <span>
-                {l.product.name}
-                {l.variant &&
-                  ` (${Object.values(l.variant.optionValues).join(" / ")})`}{" "}
-                × {l.quantity}
-              </span>
-              <span>
-                ৳{Number(l.variant?.priceOverride ?? l.product.basePrice) * l.quantity}
-              </span>
-            </div>
-          ))}
+          <div className="divide-y divide-[var(--color-border)]">
+          {groupLines.map((l) => {
+            const unit = Number(l.variant?.priceOverride ?? l.product.basePrice);
+            const max = maxQuantity(l.product, l.variant);
+            const atMax = l.quantity >= max;
+            const vId = l.variant?.id ?? null;
+            const name = `${l.product.name}${l.variant ? ` (${Object.values(l.variant.optionValues).join(" / ")})` : ""}`;
+            return (
+              <div key={`${l.product.id}:${vId ?? ""}`} className="flex items-center gap-3 py-3">
+                <div className="w-14 h-14 rounded-lg bg-[var(--color-cream-100)] overflow-hidden shrink-0">
+                  {l.product.images?.[0]?.url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={l.product.images[0].url} alt="" className="w-full h-full object-cover" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[var(--color-ink-900)] truncate">{name}</p>
+                  <p className="text-xs text-[var(--color-ink-500)]">৳{unit} each</p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <div className="inline-flex items-center rounded-full border border-[var(--color-border)]">
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(l.product.id, vId, l.quantity - 1)}
+                        aria-label={l.quantity === 1 ? `Remove ${name}` : `One less ${name}`}
+                        className="w-8 h-8 text-lg leading-none text-[var(--color-ink-700)] hover:bg-[var(--color-cream-100)] rounded-l-full"
+                      >
+                        −
+                      </button>
+                      <span className="min-w-[2rem] text-center text-sm font-semibold text-[var(--color-ink-900)]" aria-live="polite">
+                        {l.quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(l.product.id, vId, l.quantity + 1)}
+                        disabled={atMax}
+                        aria-label={`One more ${name}`}
+                        className="w-8 h-8 text-lg leading-none text-[var(--color-ink-700)] hover:bg-[var(--color-cream-100)] rounded-r-full disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(l.product.id, vId)}
+                      className="text-xs text-[var(--color-ink-500)] hover:text-red-700 underline-offset-2 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  {atMax && max > 0 && (
+                    <p className="text-[11px] text-[var(--color-gold-600)] mt-1">
+                      {max === 1 ? "Only 1 available" : `Only ${max} available`}
+                    </p>
+                  )}
+                </div>
+                <span className="text-sm font-semibold text-[var(--color-ink-900)] shrink-0">৳{unit * l.quantity}</span>
+              </div>
+            );
+          })}
+          </div>
 
           {(paymentMethod === "BKASH" || paymentMethod === "NAGAD") && (
             <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
@@ -309,7 +361,7 @@ export default function CheckoutPage() {
             className="w-4 h-4"
           />
           <span className="text-sm font-medium text-[var(--color-ink-900)]">
-            🎁 Send this as a gift to someone else
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="inline -mt-0.5 mr-1"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v9H5v-9M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg>Send this as a gift to someone else
           </span>
         </label>
 
@@ -460,7 +512,7 @@ export default function CheckoutPage() {
                 disabled={locating}
                 className="text-sm bg-white border border-[var(--color-border)] rounded-[var(--radius-pill)] px-4 py-2 hover:bg-[var(--color-emerald-50)] transition-colors disabled:opacity-50"
               >
-                {locating ? "Finding you..." : "📍 Use my current location"}
+                {locating ? "Finding you..." : <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="inline -mt-0.5 mr-1"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>Use my current location</>}
               </button>
               <button
                 type="button"
