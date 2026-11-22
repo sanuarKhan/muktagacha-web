@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import ImageUploadField from "@/components/ImageUploadField";
 import VendorSmsPhone from "@/components/VendorSmsPhone";
 import ShopPageEditor from "@/components/ShopPageEditor";
+import StockTab from "@/components/StockTab";
 import DeleteAccountDialog from "@/components/DeleteAccountDialog";
 
 // Leaflet touches window/document, so it must be loaded client-side
@@ -186,11 +187,12 @@ type VariantDraft = {
   priceOverride: string;
 };
 
-type Tab = "home" | "products" | "orders" | "bookings" | "slots" | "marketing" | "settings";
+type Tab = "home" | "products" | "stock" | "orders" | "bookings" | "slots" | "marketing" | "settings";
 
 const NAV_ITEMS: { id: Tab; label: string; icon: string }[] = [
   { id: "home", label: "Home", icon: "●" },
   { id: "products", label: "Products", icon: "▦" },
+  { id: "stock", label: "Stock", icon: "▥" },
   { id: "orders", label: "Orders", icon: "▤" },
   { id: "bookings", label: "Bookings", icon: "📅" },
   { id: "slots", label: "My Schedule", icon: "🗓" },
@@ -228,7 +230,7 @@ function VendorDashboard({ org: initialOrg, token }: { org: Organization; token:
   const navItems = NAV_ITEMS.filter((item) => {
     if (item.id === "bookings") return isServices;
     if (item.id === "slots") return isEducation;
-    if (item.id === "products") return !isServices && !isEducation;
+    if (item.id === "products" || item.id === "stock") return !isServices && !isEducation;
     return true;
   });
 
@@ -382,6 +384,8 @@ function VendorDashboard({ org: initialOrg, token }: { org: Organization; token:
               totalRevenue={totalRevenue}
               onGoTo={setTab}
             />
+          ) : tab === "stock" ? (
+            <StockTab token={token} products={products} setProducts={setProducts} />
           ) : tab === "products" ? (
             <ProductsTab
               org={org}
